@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Short Leave Tracking System</title>
-  <meta name="description" content="Short Leave tracker that saves records into a GitHub repo (via GitHub REST API)." />
+  <meta name="description" content="Short Leave tracker that saves staff lists and leave records into a single file in a GitHub repo (via GitHub REST API)." />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .kbd{border:1px solid #e5e7eb;border-bottom-width:3px;border-radius:.375rem;padding:.125rem .375rem;font-size:.75rem;}
@@ -19,7 +19,7 @@
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
       <div>
         <h1 class="text-3xl md:text-4xl font-bold text-gray-800">Short Leave Tracking System</h1>
-        <p class="text-gray-500 text-sm">Records are saved to a GitHub repo. Configure below.</p>
+        <p class="text-gray-500 text-sm">Staff lists & leave records are saved to a single JSON file in your GitHub repo.</p>
       </div>
       <div class="flex items-center gap-3">
         <span id="syncBadge" class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 border">Not connected</span>
@@ -47,8 +47,8 @@
           <input id="ghBranch" class="mt-1 w-full rounded-md border-gray-300 p-2" placeholder="e.g. main" value="main" required />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700">Data file path in repo</label>
-          <input id="ghPath" class="mt-1 w-full rounded-md border-gray-300 p-2" placeholder="e.g. data/leave_records.json" value="data/leave_records.json" required />
+          <label class="block text-sm font-medium text-gray-700">App data file path in repo</label>
+          <input id="ghPath" class="mt-1 w-full rounded-md border-gray-300 p-2" placeholder="e.g. data/app_data.json" value="data/app_data.json" required />
         </div>
         <div class="md:col-span-2">
           <label class="block text-sm font-medium text-gray-700">GitHub Personal Access Token (PAT)</label>
@@ -170,7 +170,7 @@
           <button type="submit" class="bg-gray-600 text-white px-6 py-2 rounded-md font-semibold hover:bg-gray-700">Add Staff</button>
         </div>
       </form>
-      <p class="text-xs text-gray-500 mt-3">Default staff lists are stored locally. You can keep using them as-is; records are saved to GitHub.</p>
+      <p class="text-xs text-gray-500 mt-3">Staff lists are synced to GitHub (single file). Existing leave records remain unchanged.</p>
     </div>
 
     <!-- Remove Staff Form -->
@@ -197,7 +197,7 @@
           <button type="submit" class="bg-red-600 text-white px-6 py-2 rounded-md font-semibold hover:bg-red-700">Remove Staff</button>
         </div>
       </form>
-      <p class="text-xs text-gray-500 mt-3">Removing a staff member only updates the local staff list. It does <strong>not</strong> delete existing leave records in GitHub.</p>
+      <p class="text-xs text-gray-500 mt-3">Removal updates the staff list in GitHub. It does <strong>not</strong> delete existing leave records.</p>
     </div>
   </div>
 
@@ -227,7 +227,7 @@
       return {
         owner: sessionStorage.getItem(cfgKeys.owner) || '',
         repo: sessionStorage.getItem(cfgKeys.repo) || '',
-        path: sessionStorage.getItem(cfgKeys.path) || 'data/leave_records.json',
+        path: sessionStorage.getItem(cfgKeys.path) || 'data/app_data.json',
         branch: sessionStorage.getItem(cfgKeys.branch) || 'main',
         token: sessionStorage.getItem(cfgKeys.token) || ''
       };
@@ -272,8 +272,8 @@
       return { contentText, sha: json.sha };
     }
 
-    // Robust PUT with conflict retry + clearer errors
-    async function ghPutFile(cfg, text, sha, messageHint='Update leave records') {
+    // PUT with conflict retry + clearer errors
+    async function ghPutFile(cfg, text, sha, messageHint='Update app data') {
       const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${encodeURIComponent(cfg.path)}`;
       const body = (shaToUse) => JSON.stringify({
         message: `${messageHint} (${new Date().toISOString()})`,
@@ -307,8 +307,7 @@
       throw new Error('Unexpected save flow.');
     }
 
-    // --- App State ---
-    const LOCAL_STORAGE_STAFF_KEY = 'departmentStaffLists';
+    // --- Default Data ---
     const defaultStaffLists = {
       'Verification': ['Ruwanjana Dissanayaka','Arunali Vihanga','Praveen Thrindu','Rahul Krishnan','Sherani Jewanandan','Menaka Lakmali','Dilanka Ranali','Dewni Pabasari','Gimhan Dananjana','Sumithra Anthony','Sachini Manjula','Vijini Lakshika','Tashani Ayodya','Umasha Tekmi','Iruni Nethmini','Akashara Jeraj','Ashani Nawodya'],
       'Collection': ['Dilshan Madhuwantha','Nimesh Perera','Iresha Dilhani','Asanka Nash','Pasindu Premalal','Pavithra Thangarajah','Preeni Sanoja','Varuni Lakshani','Suresh Jadeesha','Nipuni Weerakoon','Chathura Kosala','Sandeepa Lakruwan','Lahiru Lakmal','Eshan Shashika','Venura Lakshitha','Thanusha Deshani','Thanoj Vishman','Lehan Hansaja','Hasini Pituwala','Malinda Chathuranga','Vihaga Makumbura','Akalanka Fernando','Dulan Charuka','Heshan Kalhara','Prarthana Dewmini','Kavindu Kalhara','Ruchini Navanjana','Sanduni Kaushalya','Chantuka Malisha','Thilina Hashan','Dinusha Dasanayaka','Amashi Sadamini','Naduni Kaveesha','Sandali Nisansala','Chathuni Vimarsha','Sasantha Udesh','Raveesha Nethmini','Nimanthi Shamika','Lakshan Perera','Imalsha Perera','Gihan Pamodh','Harith Shenun','Nipun Sudharaka','Avishka Shalinda','Niroshan Buddika','Deshan Jayaweera','Kalindu Sachith','Chathurangi Baddevithana','Sandali Neththara','Sanduni Rupika','Amandi Upeksha','Chamilka Oshadha','Niloshan Anthany','Maleesha Kalhara','Buddini Darsha','Methdinu Jayasinhe','Ishara Maduwanthi'],
@@ -316,61 +315,57 @@
       'Quality Control': ['Amanda Udeshani','Samadhi Lanka','Kaveesha Dias','Sandhanam Kavishanth']
     };
 
-    function loadStaffLists() {
-      try {
-        const stored = localStorage.getItem(LOCAL_STORAGE_STAFF_KEY);
-        return stored ? JSON.parse(stored) : defaultStaffLists;
-      } catch (e) { return defaultStaffLists; }
-    }
-    function saveStaffLists(lists) {
-      localStorage.setItem(LOCAL_STORAGE_STAFF_KEY, JSON.stringify(lists));
-    }
+    // --- App State (single file) ---
+    // dataCache schema:
+    // { staff: {department: string[]}, records: Array<{id, department, name, date, duration, shift, month_year}> }
+    let cachedSha = null;
+    let dataCache = { staff: defaultStaffLists, records: [] };
 
-    // Records live in GitHub
-    let cachedSha = null; // last known sha of JSON file
-
-    async function loadRecordsFromGitHub() {
+    // --- Load/Save whole document ---
+    async function loadAllFromGitHub() {
       const cfg = readCfgFromSession();
       if (!cfg.owner || !cfg.repo || !cfg.path || !cfg.branch || !cfg.token) {
         syncBadge('Not connected', 'bg-yellow-50 text-yellow-700 border-yellow-300');
-        return [];
+        return { staff: defaultStaffLists, records: [] };
       }
       try {
         const { contentText, sha } = await ghGetFile(cfg);
         cachedSha = sha;
         if (!contentText) {
-          syncBadge('Connected (new file will be created)', 'bg-blue-50 text-blue-700 border-blue-300');
-          return [];
+          syncBadge('Connected (file will be created)', 'bg-blue-50 text-blue-700 border-blue-300');
+          return { staff: defaultStaffLists, records: [] };
         }
-        const data = JSON.parse(contentText);
+        const parsed = JSON.parse(contentText);
+        const staff = parsed?.staff && typeof parsed.staff === 'object' ? parsed.staff : defaultStaffLists;
+        const records = Array.isArray(parsed?.records) ? parsed.records : [];
         syncBadge('Connected ✓', 'bg-green-50 text-green-700 border-green-300');
-        return Array.isArray(data) ? data : [];
+        return { staff, records };
       } catch (e) {
         console.error(e);
-        showMessage('Failed to load from GitHub. Check settings/token.', 'error');
+        showMessage('Failed to load app data from GitHub. Using defaults locally.', 'error');
         syncBadge('Error', 'bg-red-50 text-red-700 border-red-300');
-        return [];
+        return { staff: defaultStaffLists, records: [] };
       }
     }
 
-    async function saveRecordsToGitHub(records, messageHint) {
+    async function saveAllToGitHub(nextData, messageHint) {
       const cfg = readCfgFromSession();
       if (!cfg.token) { showMessage('Missing GitHub token in Settings.', 'error'); return false; }
       try {
-        const text = JSON.stringify(records, null, 2);
+        const text = JSON.stringify(nextData, null, 2);
         const newSha = await ghPutFile(cfg, text, cachedSha, messageHint);
         cachedSha = newSha;
         syncBadge('Connected ✓', 'bg-green-50 text-green-700 border-green-300');
         return true;
       } catch (e) {
         console.error(e);
-        showMessage('Failed to save to GitHub (see console).', 'error');
+        showMessage('Failed to save app data to GitHub (see console).', 'error');
         syncBadge('Error', 'bg-red-50 text-red-700 border-red-300');
         return false;
       }
     }
 
-    // --- DOM Wiring ---
+    // --- DOM Elements ---
     const departmentDropdown = document.getElementById('department');
     const nameDropdown = document.getElementById('name');
     const leaveForm = document.getElementById('leaveForm');
@@ -382,7 +377,6 @@
     const addStaffDepartmentDropdown = document.getElementById('addStaffDepartment');
     const newStaffNameInput = document.getElementById('newStaffName');
 
-    // Remove staff elements
     const removeStaffForm = document.getElementById('removeStaffForm');
     const removeStaffDepartmentDropdown = document.getElementById('removeStaffDepartment');
     const removeStaffNameDropdown = document.getElementById('removeStaffName');
@@ -399,20 +393,20 @@
     const ghToken = document.getElementById('ghToken');
     const testConnection = document.getElementById('testConnection');
 
+    // --- UI helpers ---
     function updateNamesDropdown() {
-      const staffLists = loadStaffLists();
+      const lists = dataCache.staff || {};
       const selectedDepartment = departmentDropdown.value;
       nameDropdown.innerHTML = '<option value="">-- Select --</option>';
-      (staffLists[selectedDepartment] || []).forEach(name => {
+      (lists[selectedDepartment] || []).forEach(name => {
         const option = document.createElement('option');
         option.value = name; option.textContent = name;
         nameDropdown.appendChild(option);
       });
     }
 
-    // Remove-staff dropdown depends on department
     function updateRemoveStaffDropdown() {
-      const lists = loadStaffLists();
+      const lists = dataCache.staff || {};
       const dept = removeStaffDepartmentDropdown.value;
       const names = (lists[dept] || []).slice().sort((a,b)=>a.localeCompare(b));
       removeStaffNameDropdown.innerHTML = '';
@@ -466,19 +460,18 @@
       return csv;
     }
 
-    // App data in memory
-    let recordsCache = [];
-
+    // --- Bootstrap ---
     async function bootstrap() {
       // preload settings UI from session
       const cfg = readCfgFromSession();
-      ghOwner.value = cfg.owner; ghRepo.value = cfg.repo; ghBranch.value = cfg.branch; ghPath.value = cfg.path; ghToken.value = cfg.token;
+      ghOwner.value = cfg.owner; ghRepo.value = cfg.repo; ghBranch.value = cfg.branch;
+      ghPath.value = cfg.path; ghToken.value = cfg.token;
 
-      // try load records from GitHub (if configured)
-      recordsCache = await loadRecordsFromGitHub();
-      renderTable(recordsCache);
+      // load everything from GitHub (or defaults)
+      dataCache = await loadAllFromGitHub();
+      renderTable(dataCache.records);
       updateNamesDropdown();
-      updateRemoveStaffDropdown(); // init remove dropdown
+      updateRemoveStaffDropdown();
     }
 
     // Event: Settings open/close
@@ -488,20 +481,30 @@
     // Event: Save settings
     settingsForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const cfg = { owner: ghOwner.value.trim(), repo: ghRepo.value.trim(), branch: ghBranch.value.trim() || 'main', path: ghPath.value.trim(), token: ghToken.value.trim() };
+      const cfg = {
+        owner: ghOwner.value.trim(),
+        repo: ghRepo.value.trim(),
+        branch: ghBranch.value.trim() || 'main',
+        path: ghPath.value.trim(),
+        token: ghToken.value.trim()
+      };
       saveCfgToSession(cfg);
       showMessage('Settings saved to session.');
-      // reload data using new settings
-      recordsCache = await loadRecordsFromGitHub();
-      renderTable(recordsCache);
+
+      // Reload from GitHub with new settings
+      dataCache = await loadAllFromGitHub();
+      renderTable(dataCache.records);
+      updateNamesDropdown();
+      updateRemoveStaffDropdown();
     });
 
-    // Event: Test connection
+    // Event: Test connection (single file)
     testConnection.addEventListener('click', async () => {
       try {
-        const cfg = { owner: ghOwner.value.trim(), repo: ghRepo.value.trim(), branch: ghBranch.value.trim() || 'main', path: ghPath.value.trim(), token: ghToken.value.trim() };
-        const { contentText } = await ghGetFile(cfg);
-        showMessage(contentText ? 'Connected! File exists.' : 'Connected! File will be created on first save.');
+        const cfg = readCfgFromSession();
+        const file = await ghGetFile(cfg);
+        const msg = file.contentText ? 'Connected! App data file exists.' : 'Connected! File will be created on first save.';
+        showMessage(msg);
         syncBadge('Connected ✓', 'bg-green-50 text-green-700 border-green-300');
       } catch (e) {
         console.error(e);
@@ -529,7 +532,7 @@
 
       // limit by month: 2h
       const monthYear = date.substring(0, 7);
-      const hoursTaken = recordsCache
+      const hoursTaken = dataCache.records
         .filter(r => r.name === name && r.month_year === monthYear)
         .reduce((t, r) => t + parseInt(r.duration.split(' ')[0], 10), 0);
       const newDuration = parseInt(duration.split(' ')[0], 10);
@@ -541,11 +544,11 @@
       }
 
       const newRecord = { id: (crypto?.randomUUID?.() || String(Date.now())), department, name, date, duration, shift, month_year: monthYear };
-      const next = [...recordsCache, newRecord];
+      const nextData = { ...dataCache, records: [...dataCache.records, newRecord] };
 
-      if (await saveRecordsToGitHub(next, 'Add leave record')) {
-        recordsCache = next;
-        renderTable(recordsCache);
+      if (await saveAllToGitHub(nextData, 'Add leave record')) {
+        dataCache = nextData;
+        renderTable(dataCache.records);
         leaveForm.reset();
         showMessage('Leave record added and saved to GitHub!');
       }
@@ -567,22 +570,23 @@
         return;
       }
 
-      const next = recordsCache.filter(r => r.id !== recordIdToDelete);
-      if (next.length === recordsCache.length) {
+      const nextRecords = dataCache.records.filter(r => r.id !== recordIdToDelete);
+      if (nextRecords.length === dataCache.records.length) {
         showMessage('Record not found. Please check the ID.', 'error');
         return;
       }
 
-      if (await saveRecordsToGitHub(next, 'Delete leave record')) {
-        recordsCache = next;
-        renderTable(recordsCache);
+      const nextData = { ...dataCache, records: nextRecords };
+      if (await saveAllToGitHub(nextData, 'Delete leave record')) {
+        dataCache = nextData;
+        renderTable(dataCache.records);
         showMessage('Leave record deleted and saved to GitHub!');
       }
     });
 
     // Export CSV (client side only)
     exportButton.addEventListener('click', () => {
-      const blob = new Blob([toCSV(recordsCache)], { type: 'text/csv;charset=utf-8;' });
+      const blob = new Blob([toCSV(dataCache.records)], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
       link.download = 'leave_records.csv';
@@ -590,8 +594,8 @@
       showMessage('CSV exported!');
     });
 
-    // Add staff
-    addStaffForm.addEventListener('submit', (e) => {
+    // Add staff (sync to GitHub)
+    addStaffForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const department = addStaffDepartmentDropdown.value;
       const newName = newStaffNameInput.value.trim();
@@ -600,19 +604,26 @@
         showMessage('Please select a department and enter a name.', 'error');
         return;
       }
-      const lists = loadStaffLists();
+
+      const lists = JSON.parse(JSON.stringify(dataCache.staff || {}));
       const arr = lists[department] || (lists[department] = []);
       if (arr.includes(newName)) { showMessage('This staff member already exists in the selected department.', 'error'); return; }
+
       arr.push(newName);
-      saveStaffLists(lists);
-      showMessage(`${newName} added to ${department} department.`);
-      if (document.getElementById('department').value === department) updateNamesDropdown();
-      newStaffNameInput.value = '';
+      const nextData = { ...dataCache, staff: lists };
+
+      if (await saveAllToGitHub(nextData, `Add staff "${newName}" to ${department}`)) {
+        dataCache = nextData;
+        showMessage(`${newName} added to ${department} and synced to GitHub.`);
+        if (document.getElementById('department').value === department) updateNamesDropdown();
+        updateRemoveStaffDropdown();
+        newStaffNameInput.value = '';
+      }
     });
 
-    // Remove staff (with confirmation)
+    // Remove staff (with confirmation; sync to GitHub)
     removeStaffDepartmentDropdown.addEventListener('change', updateRemoveStaffDropdown);
-    removeStaffForm.addEventListener('submit', (e) => {
+    removeStaffForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const dept = removeStaffDepartmentDropdown.value;
       const name = removeStaffNameDropdown.value;
@@ -623,13 +634,13 @@
       }
 
       // Confirmation step
-      const ok = confirm(`Remove "${name}" from "${dept}"?\n\nThis only updates the local staff list and will NOT delete existing leave records.`);
-      if (!ok) {
+      const okCfm = confirm(`Remove "${name}" from "${dept}"?\n\nThis updates the staff list in GitHub and will NOT delete existing leave records.`);
+      if (!okCfm) {
         showMessage('Removal cancelled.');
         return;
       }
 
-      const lists = loadStaffLists();
+      const lists = JSON.parse(JSON.stringify(dataCache.staff || {}));
       const arr = lists[dept] || [];
       const idx = arr.indexOf(name);
       if (idx === -1) {
@@ -639,25 +650,18 @@
 
       arr.splice(idx, 1);
       lists[dept] = arr;
-      saveStaffLists(lists);
 
-      updateRemoveStaffDropdown();
-      if (departmentDropdown.value === dept) updateNamesDropdown();
-
-      showMessage(`${name} removed from ${dept}.`);
+      const nextData = { ...dataCache, staff: lists };
+      if (await saveAllToGitHub(nextData, `Remove staff "${name}" from ${dept}`)) {
+        dataCache = nextData;
+        updateRemoveStaffDropdown();
+        if (departmentDropdown.value === dept) updateNamesDropdown();
+        showMessage(`${name} removed from ${dept} and synced to GitHub.`);
+      }
     });
 
     // Boot
-    (function bootstrap() {
-      const cfg = readCfgFromSession();
-      ghOwner.value = cfg.owner; ghRepo.value = cfg.repo; ghBranch.value = cfg.branch; ghPath.value = cfg.path; ghToken.value = cfg.token;
-      loadRecordsFromGitHub().then(data => { 
-        recordsCache = data; 
-        renderTable(recordsCache); 
-      });
-      updateNamesDropdown();
-      updateRemoveStaffDropdown();
-    })();
+    bootstrap();
   </script>
 </body>
 </html>
