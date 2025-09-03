@@ -288,6 +288,35 @@
       return { 'Accept':'application/vnd.github+json','Authorization':`Bearer ${token}`,'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json' };
     }
 
+    // Extra diagnostics helpers
+    async function ghGetRepo({owner, repo, token}) {
+      const url = `https://api.github.com/repos/${owner}/${repo}`;
+      const res = await fetch(url, { headers: ghHeaders(token) });
+      if (!res.ok) throw new Error(`Repo check failed: ${res.status}`);
+      return res.json();
+    }
+
+    async function ghGetBranch({owner, repo, branch, token}) {
+      const url = `https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`;
+      const res = await fetch(url, { headers: ghHeaders(token) });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`Branch check failed: ${res.status}`);
+      return res.json();
+    }
+
+    async function ghDiagnose(cfg){
+      try {
+        const repo = await ghGetRepo(cfg);
+        const br = await ghGetBranch(cfg);
+        if (!br) {
+          return { ok:false, msg:`404: Branch "${cfg.branch}" was not found. Repo default branch is "${repo.default_branch}". Update the Branch field to an existing branch or create it.` };
+        }
+        return { ok:true, defaultBranch: repo.default_branch };
+      } catch(err){
+        return { ok:false, msg:'404: Repository not found or your token cannot access it. Private repos return 404 when unauthorized. Verify Owner/Repo, PAT access to that repo, and any org SSO/approval.' };
+      }
+    }
+
     async function ghGetFile({owner, repo, path, branch, token}) {
       const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`;
       const res = await fetch(url, { headers: ghHeaders(token) });
@@ -308,6 +337,7 @@
         const txt = await res.text();
         if (res.status === 409) return { conflict: true, txt };
         if (res.status === 403) throw new Error(`GitHub PUT failed: 403 (token/branch). Details: ${txt}`);
+        if (res.status === 404) throw new Error(`GitHub PUT failed: 404 (repo/branch not found, or token has no access — private repos return 404). Details: ${txt}`);
         if (res.status === 422) throw new Error(`GitHub PUT failed: 422 (path/encoding). Details: ${txt}`);
         throw new Error(`GitHub PUT failed: ${res.status} ${txt}`);
       };
@@ -532,15 +562,26 @@
 
     // Event: Test connection (single file)
     testConnection.addEventListener('click', async () => {
+      const cfg = readCfgFromSession();
+      if (!cfg.owner || !cfg.repo || !cfg.branch || !cfg.token) {
+        showMessage('Fill Owner/Repo/Branch/Token, then Save Settings.', 'error');
+        settingsPanel.classList.remove('hidden');
+        return;
+      }
+      const diag = await ghDiagnose(cfg);
+      if (!diag.ok) {
+        showMessage(diag.msg, 'error');
+        syncBadge('Error', 'bg-red-50 text-red-700 border-red-300');
+        return;
+      }
       try {
-        const cfg = readCfgFromSession();
         const file = await ghGetFile(cfg);
         const msg = file.contentText ? 'Connected! App data file exists.' : 'Connected! File will be created on first save.';
         showMessage(msg);
         syncBadge('Connected ✓', 'bg-green-50 text-green-700 border-green-300');
       } catch (e) {
         console.error(e);
-        showMessage('Connection failed. Check repo/branch/path/token.', 'error');
+        showMessage('Could not read contents file (check path).', 'error');
         syncBadge('Error', 'bg-red-50 text-red-700 border-red-300');
       }
     });
@@ -563,6 +604,12 @@
       }
       saveCfgToSession(cfg);
       showMessage('Connecting…');
+      const diag = await ghDiagnose(cfg);
+      if (!diag.ok) {
+        showMessage(diag.msg, 'error');
+        syncBadge('Error', 'bg-red-50 text-red-700 border-red-300');
+        return;
+      }
       try {
         const file = await ghGetFile(cfg);
         const msg = file.contentText ? 'Connected! App data file exists.' : 'Connected! File will be created on first save.';
@@ -574,7 +621,7 @@
         updateRemoveStaffDropdown();
       } catch (e) {
         console.error(e);
-        showMessage('Connection failed. Check repo/branch/path/token.', 'error');
+        showMessage('Could not read contents file (check path).', 'error');
         syncBadge('Error', 'bg-red-50 text-red-700 border-red-300');
       }
     });
