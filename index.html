@@ -3,6 +3,8 @@
 <title>Short Leave Tracking System</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>.kbd{border:1px solid #e5e7eb;border-bottom-width:3px;border-radius:.375rem;padding:.125rem .375rem;font-size:.75rem}</style>
+<!-- Local, untracked token (optional). Keep token.js out of git. -->
+<script src="token.js"></script>
 </head><body class="bg-gray-100 font-sans p-4 min-h-screen flex items-center justify-center">
 <div id="messageBox" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 p-4 rounded-md transition-all duration-300 transform scale-0 opacity-0"></div>
 
@@ -17,22 +19,25 @@
     </div>
   </div>
 
+  <!-- Settings -->
   <div id="settingsPanel" class="hidden mb-6 border rounded-lg">
     <div class="p-4 bg-gray-50 border-b flex items-center justify-between">
       <h2 class="text-lg font-semibold">GitHub Settings</h2><button id="closeSettings" class="text-sm text-gray-600 hover:text-gray-900">Close</button>
     </div>
     <form id="settingsForm" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
       <div><label class="block text-sm font-medium text-gray-700">Owner / Org</label>
-        <input id="ghOwner" class="mt-1 w-full rounded-md border-gray-300 p-2 bg-gray-100" value="callreconcredit-droid" disabled></div>
+        <input class="mt-1 w-full rounded-md border-gray-300 p-2 bg-gray-100" value="callreconcredit-droid" disabled></div>
       <div><label class="block text-sm font-medium text-gray-700">Repository</label>
-        <input id="ghRepo" class="mt-1 w-full rounded-md border-gray-300 p-2 bg-gray-100" value="octest" disabled></div>
+        <input class="mt-1 w-full rounded-md border-gray-300 p-2 bg-gray-100" value="octest" disabled></div>
       <div><label class="block text-sm font-medium text-gray-700">Branch</label>
         <input id="ghBranch" class="mt-1 w-full rounded-md border-gray-300 p-2" value="main" required></div>
       <div><label class="block text-sm font-medium text-gray-700">App data file path</label>
         <input id="ghPath" class="mt-1 w-full rounded-md border-gray-300 p-2" value="data/app_data.json" required></div>
-      <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700">GitHub Personal Access Token (PAT)</label>
-        <input id="ghToken" type="password" class="mt-1 w-full rounded-md border-gray-300 p-2" placeholder="Paste your token (contents:read, contents:write)" required>
-        <p class="text-xs text-gray-500 mt-1">Token is stored only in <b>sessionStorage</b> (cleared on tab close). You can also pass it once via <span class="font-mono">?token=...</span> or <span class="font-mono">#token=...</span>.</p></div>
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-gray-700">GitHub Personal Access Token (PAT)</label>
+        <input id="ghToken" type="password" class="mt-1 w-full rounded-md border-gray-300 p-2" placeholder="Paste token or provide via token.js / URL">
+        <p class="text-xs text-gray-500 mt-1">Token is kept in <b>sessionStorage</b> (cleared on tab close). You can also pass via <span class="font-mono">?token=...</span> or <span class="font-mono">#token=...</span>.</p>
+      </div>
       <div class="md:col-span-2 flex justify-end gap-2">
         <button type="button" id="testConnection" class="px-4 py-2 rounded bg-gray-100 border hover:bg-gray-200">Test</button>
         <button type="submit" class="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700">Save Settings</button>
@@ -40,16 +45,17 @@
     </form>
   </div>
 
+  <!-- Add record -->
   <div class="mb-8 p-6 bg-gray-50 rounded-lg shadow-inner">
     <h2 class="text-2xl font-semibold text-gray-700 mb-4">Add a New Leave Record</h2>
     <form id="leaveForm" class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div><label class="block text-sm font-medium text-gray-700">Department</label>
-        <select id="department" class="mt-1 block w-full rounded-md border-gray-300 p-2" required>
+        <select id="department" class="mt-1 w-full rounded-md border-gray-300 p-2" required>
           <option value="">-- Select --</option><option>Verification</option><option>Collection</option><option>CS|TS|RPD</option><option>Quality Control</option>
         </select></div>
       <div><label class="block text-sm font-medium text-gray-700">Name</label>
-        <select id="name" class="mt-1 block w-full rounded-md border-gray-300 p-2" required><option value="">-- Select --</option></select></div>
-      <div><label class="block text-sm font-medium text-gray-700">Date</label><input type="date" id="date" class="mt-1 block w-full rounded-md border-gray-300 p-2" required></div>
+        <select id="name" class="mt-1 w-full rounded-md border-gray-300 p-2" required><option value="">-- Select --</option></select></div>
+      <div><label class="block text-sm font-medium text-gray-700">Date</label><input type="date" id="date" class="mt-1 w-full rounded-md border-gray-300 p-2" required></div>
       <div><label class="block text-sm font-medium text-gray-700">Duration</label>
         <div class="mt-2 space-y-2">
           <label class="flex items-center"><input name="leaveDuration" type="radio" value="1 hour" class="h-4 w-4 text-indigo-600 border-gray-300" required><span class="ml-2 text-sm">1 hour</span></label>
@@ -67,6 +73,7 @@
     </form>
   </div>
 
+  <!-- Table -->
   <div class="overflow-x-auto relative shadow-md sm:rounded-lg">
     <h2 class="text-2xl font-semibold text-gray-700 mb-4 px-2">Leave Records</h2>
     <table class="w-full text-sm text-left text-gray-700">
@@ -77,6 +84,7 @@
     </table>
   </div>
 
+  <!-- Delete -->
   <div class="mt-8 p-6 bg-gray-50 rounded-lg shadow-inner">
     <h2 class="text-2xl font-semibold text-gray-700 mb-4">Delete a Record</h2>
     <p class="text-sm text-gray-500 mb-4">Use the Record ID from the table above.</p>
@@ -88,14 +96,15 @@
     </form>
   </div>
 
+  <!-- Add / Remove staff -->
   <div class="mt-8 p-6 bg-gray-50 rounded-lg shadow-inner">
     <h2 class="text-2xl font-semibold text-gray-700 mb-4">Add a New Staff Member</h2>
     <form id="addStaffForm" class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div><label class="block text-sm font-medium text-gray-700">Department</label>
-        <select id="addStaffDepartment" class="mt-1 block w-full rounded-md border-gray-300 p-2" required>
+        <select id="addStaffDepartment" class="mt-1 w-full rounded-md border-gray-300 p-2" required>
           <option value="">-- Select --</option><option>Verification</option><option>Collection</option><option>CS|TS|RPD</option><option>Quality Control</option>
         </select></div>
-      <div><label class="block text-sm font-medium text-gray-700">Staff Name</label><input id="newStaffName" class="mt-1 block w-full rounded-md border-gray-300 p-2" required></div>
+      <div><label class="block text-sm font-medium text-gray-700">Staff Name</label><input id="newStaffName" class="mt-1 w-full rounded-md border-gray-300 p-2" required></div>
       <div class="col-span-1 md:col-span-3 flex justify-end"><button class="bg-gray-600 text-white px-6 py-2 rounded-md font-semibold hover:bg-gray-700">Add Staff</button></div>
     </form>
     <p class="text-xs text-gray-500 mt-3">Staff lists sync to GitHub. Existing leave records stay unchanged.</p>
@@ -105,17 +114,18 @@
     <h2 class="text-2xl font-semibold text-gray-700 mb-4">Remove a Staff Member</h2>
     <form id="removeStaffForm" class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div><label class="block text-sm font-medium text-gray-700">Department</label>
-        <select id="removeStaffDepartment" class="mt-1 block w-full rounded-md border-gray-300 p-2" required>
+        <select id="removeStaffDepartment" class="mt-1 w-full rounded-md border-gray-300 p-2" required>
           <option value="">-- Select --</option><option>Verification</option><option>Collection</option><option>CS|TS|RPD</option><option>Quality Control</option>
         </select></div>
       <div><label class="block text-sm font-medium text-gray-700">Staff Name</label>
-        <select id="removeStaffName" class="mt-1 block w-full rounded-md border-gray-300 p-2" required><option value="">-- Select a department first --</option></select></div>
+        <select id="removeStaffName" class="mt-1 w-full rounded-md border-gray-300 p-2" required><option value="">-- Select a department first --</option></select></div>
       <div class="col-span-1 md:col-span-3 flex justify-end"><button class="bg-red-600 text-white px-6 py-2 rounded-md font-semibold hover:bg-red-700">Remove Staff</button></div>
     </form>
     <p class="text-xs text-gray-500 mt-3">Removal updates the staff list only; it doesn’t delete past records.</p>
   </div>
 </div>
 
+<!-- Confirm modal -->
 <div id="confirmModal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
   <div id="modalOverlay" class="absolute inset-0 bg-black/40"></div>
   <div class="absolute inset-0 flex items-center justify-center p-4">
@@ -148,18 +158,14 @@ async function ghBranch({owner,repo,branch,token}){const r=await fetch(`https://
 async function diagnose(c){try{const rp=await ghRepo(c);const br=await ghBranch(c);if(!br)return{ok:false,msg:`404: Branch "${c.branch}" not found. Repo default branch is "${rp.default_branch}".`};return{ok:true,defaultBranch:rp.default_branch}}catch(e){return{ok:false,msg:'404: Repo not found or token has no access (private repos return 404). Check PAT / org SSO.'}}}
 async function ghGet({owner,repo,path,branch,token}){const r=await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`,{headers:ghH(token)});if(r.status===404)return{contentText:null,sha:null};if(!r.ok)throw new Error(`GET failed: ${r.status}`);const j=await r.json();return{contentText:fromB64(j.content||''),sha:j.sha}}
 async function ghPut(c,text,sha,msg='Update app data'){const url=`https://api.github.com/repos/${c.owner}/${c.repo}/contents/${encodeURIComponent(c.path)}`;const body=(x)=>JSON.stringify({message:`${msg} (${new Date().toISOString()})`,content:toB64(text),branch:c.branch,...(x?{sha:x}:{})});const attempt=async(x)=>{const r=await fetch(url,{method:'PUT',headers:ghH(c.token),body:body(x)});if(r.ok)return(await r.json()).content.sha;const t=await r.text();if(r.status===409)return{conflict:true,txt:t};if(r.status===403)throw new Error(`PUT 403 (token/branch). ${t}`);if(r.status===404)throw new Error(`PUT 404 (repo/branch or access). ${t}`);if(r.status===422)throw new Error(`PUT 422 (path/encoding). ${t}`);throw new Error(`PUT ${r.status} ${t}`)};const a=await attempt(sha);if(typeof a==='string')return a;if(a&&a.conflict){const {sha:latest}=await ghGet(c);if(!latest)throw new Error('Conflict but no latest SHA.');const b=await attempt(latest);if(typeof b==='string')return b;throw new Error('Conflict persisted.')}throw new Error('Unexpected save flow')}
+
 const defaults={'Verification':['Ruwanjana Dissanayaka','Arunali Vihanga','Praveen Thrindu','Rahul Krishnan'],'Collection':['Dilshan Madhuwantha','Nimesh Perera','Iresha Dilhani','Asanka Nash'],'CS|TS|RPD':['Gayanthi Madhuwanthi','Noyeli Yalindi','Fathima Sasmiya','Jegan Gayathri'],'Quality Control':['Amanda Udeshani','Samadhi Lanka','Kaveesha Dias','Sandhanam Kavishanth']};
 let SHA=null; let data={staff:defaults,records:[]};
 
-function saveCfg(c){sessionStorage.setItem(K.owner,c.owner||'');sessionStorage.setItem(K.repo,c.repo||'');sessionStorage.setItem(K.path,c.path||'');sessionStorage.setItem(K.branch,c.branch||'');sessionStorage.setItem(K.token,c.token||'')}
-function readCfg(){return{
-  owner: 'callreconcredit-droid',
-  repo: 'octest',
-  path: sessionStorage.getItem(K.path)||'data/app_data.json',
-  branch: sessionStorage.getItem(K.branch)||'main',
-  token: sessionStorage.getItem(K.token)||''
-}}
+function saveCfg(c){sessionStorage.setItem(K.branch,c.branch||'');sessionStorage.setItem(K.path,c.path||'');sessionStorage.setItem(K.token,c.token||'')}
+function readCfg(){return{owner:'callreconcredit-droid',repo:'octest',path:sessionStorage.getItem(K.path)||'data/app_data.json',branch:sessionStorage.getItem(K.branch)||'main',token:sessionStorage.getItem(K.token)||''}}
 function pickTokenFromURL(){try{const u=new URL(window.location.href);const t=u.searchParams.get('token')||u.hash.replace(/^#token=/,'');if(t){sessionStorage.setItem(K.token,t);u.searchParams.delete('token');history.replaceState({},'',u.pathname+u.search);if(location.hash.startsWith('#token='))history.replaceState({},'',u.pathname+u.search)}}catch{}}
+function pickTokenFromGlobal(){try{if(window.GH_PAT){sessionStorage.setItem(K.token,window.GH_PAT)}}catch{}}
 
 const dd=q('department'), nd=q('name'), lf=q('leaveForm'), tb=q('leaveTableBody'), xb=q('exportButton'), df=q('deleteForm'),
       asf=q('addStaffForm'), asd=q('addStaffDepartment'), nsi=q('newStaffName'),
@@ -176,19 +182,19 @@ function toCSV(rows){let s='Record ID,Department,Name,Date,Duration,Shift\n'; ro
 async function loadAll(){const c=readCfg();if(!c.token){badge('Not connected','bg-yellow-50 text-yellow-700 border-yellow-300');return{staff:defaults,records:[]}}try{const {contentText,sha}=await ghGet(c);SHA=sha;if(!contentText){badge('Connected (file will be created)','bg-blue-50 text-blue-700 border-blue-300');return{staff:defaults,records:[]}}const j=JSON.parse(contentText),staff=j?.staff&&typeof j.staff==='object'?j.staff:defaults,records=Array.isArray(j?.records)?j.records:[];badge('Connected ✓','bg-green-50 text-green-700 border-green-300');return{staff,records}}catch(e){console.error(e);toast('Failed to load from GitHub. Using local defaults.','error');badge('Error','bg-red-50 text-red-700 border-red-300');return{staff:defaults,records:[]}}}
 async function saveAll(next,msg){const c=readCfg();if(!c.token){toast('Missing GitHub token in Settings.','error');return false}try{const s=await ghPut(c,JSON.stringify(next,null,2),SHA,msg);SHA=s;badge('Connected ✓','bg-green-50 text-green-700 border-green-300');return true}catch(e){console.error(e);toast('Failed to save to GitHub (see console).','error');badge('Error','bg-red-50 text-red-700 border-red-300');return false}}
 
-async function boot(){pickTokenFromURL();const c=readCfg();ghB.value=c.branch;ghP.value=c.path;ghT.value=c.token;data=await loadAll();draw(data.records);namesForDept();namesForRemove()}
+async function boot(){pickTokenFromGlobal();pickTokenFromURL();const c=readCfg();ghB.value=c.branch;ghP.value=c.path;ghT.value=''; /* don’t reveal token */ data=await loadAll();draw(data.records);namesForDept();namesForRemove()}
 openBtn&&openBtn.addEventListener('click',()=>panel.classList.remove('hidden'));
 closeBtn&&closeBtn.addEventListener('click',()=>panel.classList.add('hidden'));
 
-sf&&sf.addEventListener('submit',async e=>{e.preventDefault();const c={owner:'callreconcredit-droid',repo:'octest',branch:(ghB.value.trim()||'main'),path:ghP.value.trim(),token:ghT.value.trim()};sessionStorage.setItem(K.branch,c.branch);sessionStorage.setItem(K.path,c.path);sessionStorage.setItem(K.token,c.token);toast('Settings saved. Connecting…');try{const file=await ghGet(c);toast(file.contentText?'Connected! File exists.':'Connected! File will be created.');badge('Connected ✓','bg-green-50 text-green-700 border-green-300')}catch(e){console.error(e);toast('Connection failed. Check branch/path/token.','error');badge('Error','bg-red-50 text-red-700 border-red-300')} data=await loadAll();draw(data.records);namesForDept();namesForRemove()});
+sf&&sf.addEventListener('submit',async e=>{e.preventDefault();const c={owner:'callreconcredit-droid',repo:'octest',branch:(ghB.value.trim()||'main'),path:ghP.value.trim(),token:(ghT.value.trim()||sessionStorage.getItem(K.token)||'')};saveCfg(c);toast('Settings saved. Connecting…');try{const file=await ghGet(c);toast(file.contentText?'Connected! File exists.':'Connected! File will be created.');badge('Connected ✓','bg-green-50 text-green-700 border-green-300')}catch(e){console.error(e);toast('Connection failed. Check branch/path/token.','error');badge('Error','bg-red-50 text-red-700 border-red-300')} data=await loadAll();draw(data.records);namesForDept();namesForRemove()});
 
-testBtn&&testBtn.addEventListener('click',async()=>{const c=readCfg();if(!c.branch||!c.token){toast('Enter Branch and Token, then Save Settings.','error');panel.classList.remove('hidden');return}const d=await diagnose({...c});if(!d.ok){toast(d.msg,'error');badge('Error','bg-red-50 text-red-700 border-red-300');return}try{const f=await ghGet(c);toast(f.contentText?'Connected! File exists.':'Connected! File will be created.');badge('Connected ✓','bg-green-50 text-green-700 border-green-300')}catch(e){console.error(e);toast('Could not read contents file (check path).','error');badge('Error','bg-red-50 text-red-700 border-red-300')}})
+testBtn&&testBtn.addEventListener('click',async()=>{const c=readCfg();if(!c.branch||!c.token){toast('Enter Branch/Path and ensure token (token.js, URL or field).','error');panel.classList.remove('hidden');return}const d=await diagnose(c);if(!d.ok){toast(d.msg,'error');badge('Error','bg-red-50 text-red-700 border-red-300');return}try{const f=await ghGet(c);toast(f.contentText?'Connected! File exists.':'Connected! File will be created.');badge('Connected ✓','bg-green-50 text-green-700 border-green-300')}catch(e){console.error(e);toast('Could not read contents file (check path).','error');badge('Error','bg-red-50 text-red-700 border-red-300')}})
 
-connectBtn&&connectBtn.addEventListener('click',async()=>{const c=readCfg();if(!c.branch||!c.path||!c.token){panel.classList.remove('hidden');toast('Fill Branch/Path/Token, then Save Settings.','error');return}toast('Connecting…');const d=await diagnose(c);if(!d.ok){toast(d.msg,'error');badge('Error','bg-red-50 text-red-700 border-red-300');return}try{const f=await ghGet(c);toast(f.contentText?'Connected! File exists.':'Connected! File will be created.');badge('Connected ✓','bg-green-50 text-green-700 border-green-300');data=await loadAll();draw(data.records);namesForDept();namesForRemove()}catch(e){console.error(e);toast('Could not read contents file (check path).','error');badge('Error','bg-red-50 text-red-700 border-red-300')}})
+connectBtn&&connectBtn.addEventListener('click',async()=>{const c=readCfg();if(!c.branch||!c.path||!c.token){panel.classList.remove('hidden');toast('Provide Branch/Path and a token (token.js, URL or field).','error');return}toast('Connecting…');const d=await diagnose(c);if(!d.ok){toast(d.msg,'error');badge('Error','bg-red-50 text-red-700 border-red-300');return}try{const f=await ghGet(c);toast(f.contentText?'Connected! File exists.':'Connected! File will be created.');badge('Connected ✓','bg-green-50 text-green-700 border-green-300');data=await loadAll();draw(data.records);namesForDept();namesForRemove()}catch(e){console.error(e);toast('Could not read contents file (check path).','error');badge('Error','bg-red-50 text-red-700 border-red-300')}})
 
 q('department').addEventListener('change',namesForDept);
 
-lf.addEventListener('submit',async e=>{e.preventDefault();const name=nd.value, dept=q('department').value, date=q('date').value, duration=document.querySelector('input[name="leaveDuration"]:checked')?.value, shift=document.querySelector('input[name="shift"]:checked')?.value; if(!name||!dept||!date||!duration||!shift){toast('Please fill out all fields.','error');return}const ym=date.substring(0,7), used=data.records.filter(r=>r.name===name&&r.month_year===ym).reduce((t,r)=>t+parseInt(r.duration,10)||t+parseInt(r.duration.split(' ')[0],10),0);const add=parseInt(duration,10)||parseInt(duration.split(' ')[0],10); if(used+add>2){toast(`Monthly limit is 2 hours. ${name} has ${Math.max(0,2-used)} hour(s) left for ${ym}.`,'error');return}const rec={id:(crypto?.randomUUID?.()||String(Date.now())),department:dept,name,date,duration,shift,month_year:ym};const next={...data,records:[...data.records,rec]}; if(await saveAll(next,'Add leave record')){data=next;draw(data.records);lf.reset();toast('Leave record added and saved to GitHub!')}})
+lf.addEventListener('submit',async e=>{e.preventDefault();const name=q('name').value, dept=q('department').value, date=q('date').value, duration=document.querySelector('input[name="leaveDuration"]:checked')?.value, shift=document.querySelector('input[name="shift"]:checked')?.value; if(!name||!dept||!date||!duration||!shift){toast('Please fill out all fields.','error');return}const ym=date.substring(0,7), used=data.records.filter(r=>r.name===name&&r.month_year===ym).reduce((t,r)=>t+parseInt(r.duration,10)||t+parseInt(r.duration.split(' ')[0],10),0);const add=parseInt(duration,10)||parseInt(duration.split(' ')[0],10); if(used+add>2){toast(`Monthly limit is 2 hours. ${name} has ${Math.max(0,2-used)} hour(s) left for ${ym}.`,'error');return}const rec={id:(crypto?.randomUUID?.()||String(Date.now())),department:dept,name,date,duration,shift,month_year:ym};const next={...data,records:[...data.records,rec]}; if(await saveAll(next,'Add leave record')){data=next;draw(data.records);lf.reset();toast('Leave record added and saved to GitHub!')}})
 
 df.addEventListener('submit',async e=>{e.preventDefault();const u=q('deleteUsername').value,p=q('deletePassword').value,id=q('deleteRecordId').value.trim(); if(u!=='admin'||p!=='damin'){toast('Invalid username or password.','error');return} if(!id){toast('Enter a Record ID.','error');return}const nextRecs=data.records.filter(r=>r.id!==id);if(nextRecs.length===data.records.length){toast('Record not found.','error');return}const next={...data,records:nextRecs}; if(await saveAll(next,'Delete leave record')){data=next;draw(data.records);toast('Leave record deleted and saved to GitHub!')}})
 
@@ -197,13 +203,14 @@ xb.addEventListener('click',()=>{const blob=new Blob([toCSV(data.records)],{type
 asf.addEventListener('submit',async e=>{e.preventDefault();const d=asd.value, n=nsi.value.trim(); if(!d||!n){toast('Select a department and enter a name.','error');return}const L=JSON.parse(JSON.stringify(data.staff||{})), arr=L[d]||(L[d]=[]); if(arr.includes(n)){toast('This staff member already exists.','error');return}arr.push(n);const next={...data,staff:L}; if(await saveAll(next,`Add staff "${n}" to ${d}`)){data=next;toast(`${n} added to ${d} and synced to GitHub.`); if(q('department').value===d)namesForDept();namesForRemove();nsi.value=''}})
 
 rsd.addEventListener('change',namesForRemove);
-rsf.addEventListener('submit',e=>{e.preventDefault();const d=rsd.value,n=rsn.value; if(!d||!n){toast('Select a department and staff member.','error');return}pending={dept:d,name:n}; mN.textContent=n; mD.textContent=d; openModal()});
+let pendingRemove=null;
+rsf.addEventListener('submit',e=>{e.preventDefault();const d=rsd.value,n=rsn.value; if(!d||!n){toast('Select a department and staff member.','error');return}pendingRemove={dept:d,name:n}; mN.textContent=n; mD.textContent=d; openModal()});
 
 function openModal(){m.classList.remove('hidden');m.setAttribute('aria-hidden','false');setTimeout(()=>mY.focus(),0);document.addEventListener('keydown',esc)}
 function closeModal(){m.classList.add('hidden');m.setAttribute('aria-hidden','true');document.removeEventListener('keydown',esc)}
 function esc(e){if(e.key==='Escape')closeModal()}
 mO.addEventListener('click',closeModal); mX.addEventListener('click',closeModal);
-mY.addEventListener('click',async()=>{if(!pending)return;const {dept,name}=pending;const L=JSON.parse(JSON.stringify(data.staff||{})), arr=L[dept]||[], i=arr.indexOf(name); if(i===-1){toast('Staff not found in department.','error');closeModal();pending=null;return}arr.splice(i,1);L[dept]=arr;const next={...data,staff:L};const ok=await saveAll(next,`Remove staff "${name}" from ${dept}`); if(ok){data=next;namesForRemove(); if(q('department').value===dept)namesForDept(); toast(`${name} removed from ${dept} and synced to GitHub.`)} closeModal();pending=null})
+mY.addEventListener('click',async()=>{if(!pendingRemove)return;const {dept,name}=pendingRemove;const L=JSON.parse(JSON.stringify(data.staff||{})), arr=L[dept]||[], i=arr.indexOf(name); if(i===-1){toast('Staff not found in department.','error');closeModal();pendingRemove=null;return}arr.splice(i,1);L[dept]=arr;const next={...data,staff:L};const ok=await saveAll(next,`Remove staff "${name}" from ${dept}`); if(ok){data=next;namesForRemove(); if(q('department').value===dept)namesForDept(); toast(`${name} removed from ${dept} and synced to GitHub.`)} closeModal();pendingRemove=null})
 
 document.readyState==='loading'?document.addEventListener('DOMContentLoaded',()=>boot().catch(console.error)):boot().catch(console.error);
 </script>
