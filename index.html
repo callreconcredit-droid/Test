@@ -239,7 +239,16 @@
     function showMessage(message, type = 'info') {
       const messageBox = document.getElementById('messageBox');
       messageBox.textContent = message;
-      messageBox.className = `p-4 rounded-md mt-4 text-center text-white ${type === 'error' ? 'bg-red-500' : 'bg-green-600'} transition-all duration-300 transform scale-100 opacity-100`;
+      const basePos = 'fixed top-4 left-1/2 -translate-x-1/2 z-50';
+      const look = 'px-4 py-2 rounded-md text-sm text-white shadow-lg border transition-all duration-300 transform opacity-100 scale-100 max-w-[90vw]';
+      const color = type === 'error' ? 'bg-red-600 border-red-700' : 'bg-green-600 border-green-700';
+      // IMPORTANT: keep the fixed top-center classes so the toast stays at the top middle
+      messageBox.className = `${basePos} ${look} ${color}`;
+      clearTimeout(showMessage._t);
+      showMessage._t = setTimeout(() => {
+        messageBox.classList.add('opacity-0', 'scale-0');
+      }, 3000);
+    } transition-all duration-300 transform scale-100 opacity-100`;
       clearTimeout(showMessage._t);
       showMessage._t = setTimeout(() => messageBox.classList.add('scale-0', 'opacity-0'), 3000);
     }
