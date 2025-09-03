@@ -528,12 +528,12 @@
       updateRemoveStaffDropdown();
     }
 
-    // Event: Settings open/close
-    openSettingsBtn.addEventListener('click', () => settingsPanel.classList.remove('hidden'));
-    closeSettingsBtn.addEventListener('click', () => settingsPanel.classList.add('hidden'));
+    // Event: Settings open/close (guarded if elements not found)
+    if (openSettingsBtn) openSettingsBtn.addEventListener('click', () => settingsPanel.classList.remove('hidden'));
+    if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', () => settingsPanel.classList.add('hidden'));
 
     // Event: Save settings (also connects immediately)
-    settingsForm.addEventListener('submit', async (e) => {
+    if (settingsForm) settingsForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const cfg = {
         owner: ghOwner.value.trim(),
@@ -561,7 +561,7 @@
     });
 
     // Event: Test connection (single file)
-    testConnection.addEventListener('click', async () => {
+    if (testConnection) testConnection.addEventListener('click', async () => {
       const cfg = readCfgFromSession();
       if (!cfg.owner || !cfg.repo || !cfg.branch || !cfg.token) {
         showMessage('Fill Owner/Repo/Branch/Token, then Save Settings.', 'error');
@@ -587,7 +587,7 @@
     });
 
     // Event: Header "Connect" button — uses live form values if present, else session
-    connectNowBtn.addEventListener('click', async () => {
+    if (connectNowBtn) connectNowBtn.addEventListener('click', async () => {
       const formCfg = {
         owner: ghOwner.value.trim(),
         repo: ghRepo.value.trim(),
@@ -801,7 +801,12 @@
     });
 
     // Boot
-    bootstrap();
+    // Boot safely after DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => bootstrap().catch(console.error));
+    } else {
+      bootstrap().catch(console.error);
+    }
   </script>
 </body>
 </html>
