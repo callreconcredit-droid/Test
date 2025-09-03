@@ -23,6 +23,7 @@
       </div>
       <div class="flex items-center gap-3">
         <span id="syncBadge" class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 border">Not connected</span>
+        <button id="connectNow" class="bg-indigo-600 text-white px-4 py-2 rounded-md font-semibold hover:bg-indigo-700">Connect</button>
         <button id="openSettings" class="bg-gray-800 text-white px-4 py-2 rounded-md font-semibold hover:bg-black">Settings</button>
       </div>
     </div>
@@ -263,10 +264,10 @@
       };
     }
 
-    function syncBadge(text, color) {
+    function syncBadge(text, classes) {
       const el = document.getElementById('syncBadge');
       el.textContent = text;
-      el.className = `text-xs px-2 py-1 rounded border ${color}`;
+      el.className = `text-xs px-2 py-1 rounded border ${classes}`;
     }
 
     // --- Base64 helpers (UTF-8 safe) ---
@@ -397,6 +398,7 @@
     const ghPath = document.getElementById('ghPath');
     const ghToken = document.getElementById('ghToken');
     const testConnection = document.getElementById('testConnection');
+    const connectNowBtn = document.getElementById('connectNow');
 
     // Modal elements & state
     const confirmModal = document.getElementById('confirmModal');
@@ -447,7 +449,7 @@
         const noDataRow = document.createElement('tr');
         const noDataCell = document.createElement('td');
         noDataCell.colSpan = 6;
-        noDataCell className = 'text-center py-4 text-gray-500 italic';
+        noDataCell.className = 'text-center py-4 text-gray-500 italic';
         noDataCell.textContent = 'No leave records found. Add one above!';
         noDataRow.appendChild(noDataCell);
         tableBody.appendChild(noDataRow);
@@ -491,7 +493,7 @@
     openSettingsBtn.addEventListener('click', () => settingsPanel.classList.remove('hidden'));
     closeSettingsBtn.addEventListener('click', () => settingsPanel.classList.add('hidden'));
 
-    // Event: Save settings
+    // Event: Save settings (also connects immediately)
     settingsForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const cfg = {
@@ -502,7 +504,17 @@
         token: ghToken.value.trim()
       };
       saveCfgToSession(cfg);
-      showMessage('Settings saved to session.');
+      showMessage('Settings saved to session. Connecting…');
+      try {
+        const file = await ghGetFile(cfg);
+        const msg = file.contentText ? 'Connected! App data file exists.' : 'Connected! File will be created on first save.';
+        showMessage(msg);
+        syncBadge('Connected ✓', 'bg-green-50 text-green-700 border-green-300');
+      } catch(err) {
+        console.error(err);
+        showMessage('Connection failed. Check repo/branch/path/token.', 'error');
+        syncBadge('Error', 'bg-red-50 text-red-700 border-red-300');
+      }
       dataCache = await loadAllFromGitHub();
       renderTable(dataCache.records);
       updateNamesDropdown();
@@ -517,6 +529,40 @@
         const msg = file.contentText ? 'Connected! App data file exists.' : 'Connected! File will be created on first save.';
         showMessage(msg);
         syncBadge('Connected ✓', 'bg-green-50 text-green-700 border-green-300');
+      } catch (e) {
+        console.error(e);
+        showMessage('Connection failed. Check repo/branch/path/token.', 'error');
+        syncBadge('Error', 'bg-red-50 text-red-700 border-red-300');
+      }
+    });
+
+    // Event: Header "Connect" button — uses live form values if present, else session
+    connectNowBtn.addEventListener('click', async () => {
+      const formCfg = {
+        owner: ghOwner.value.trim(),
+        repo: ghRepo.value.trim(),
+        branch: (ghBranch.value || '').trim(),
+        path: ghPath.value.trim(),
+        token: ghToken.value.trim()
+      };
+      const fromForm = formCfg.owner && formCfg.repo && formCfg.branch && formCfg.path && formCfg.token;
+      const cfg = fromForm ? formCfg : readCfgFromSession();
+      if (!cfg.owner || !cfg.repo || !cfg.path || !cfg.branch || !cfg.token) {
+        settingsPanel.classList.remove('hidden');
+        showMessage('Fill in all GitHub settings, then click Save Settings.', 'error');
+        return;
+      }
+      saveCfgToSession(cfg);
+      showMessage('Connecting…');
+      try {
+        const file = await ghGetFile(cfg);
+        const msg = file.contentText ? 'Connected! App data file exists.' : 'Connected! File will be created on first save.';
+        showMessage(msg);
+        syncBadge('Connected ✓', 'bg-green-50 text-green-700 border-green-300');
+        dataCache = await loadAllFromGitHub();
+        renderTable(dataCache.records);
+        updateNamesDropdown();
+        updateRemoveStaffDropdown();
       } catch (e) {
         console.error(e);
         showMessage('Connection failed. Check repo/branch/path/token.', 'error');
@@ -570,7 +616,7 @@
       const password = document.getElementById('deletePassword').value;
       const recordIdToDelete = document.getElementById('deleteRecordId').value.trim();
 
-      if (username !== 'admin' || password !== 'damin') {
+      if (username !== 'admin' || password !== 'damin') { // adjust credentials as needed
         showMessage('Invalid username or password.', 'error');
         return;
       }
