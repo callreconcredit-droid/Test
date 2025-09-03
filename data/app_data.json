@@ -127,6 +127,15 @@
       "duration": "1 hour",
       "shift": "Evening",
       "month_year": "2025-09"
+    },
+    {
+      "id": "4a50024a-44e7-4367-a594-1c7d2088af3b",
+      "department": "Collection",
+      "name": "Dilshan Madhuwantha",
+      "date": "2025-09-11",
+      "duration": "2 hours",
+      "shift": "Evening",
+      "month_year": "2025-09"
     }
   ]
 }
