@@ -11,7 +11,7 @@
   </style>
 </head>
 <body class="bg-gray-100 font-sans p-4 min-h-screen flex items-center justify-center">
-  <!-- Message Box -->
+  <!-- Message Box (top-center toast) -->
   <div id="messageBox" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 p-4 rounded-md transition-all duration-300 transform scale-0 opacity-0"></div>
 
   <div class="container mx-auto p-6 md:p-8 bg-white rounded-lg shadow-xl max-w-5xl">
@@ -238,19 +238,16 @@
     // --- Utilities ---
     function showMessage(message, type = 'info') {
       const messageBox = document.getElementById('messageBox');
-      messageBox.textContent = message;
       const basePos = 'fixed top-4 left-1/2 -translate-x-1/2 z-50';
-      const look = 'px-4 py-2 rounded-md text-sm text-white shadow-lg border transition-all duration-300 transform opacity-100 scale-100 max-w-[90vw]';
+      const look = 'px-4 py-2 rounded-md text-sm text-white shadow-lg border transition-all duration-300 transform max-w-[90vw]';
       const color = type === 'error' ? 'bg-red-600 border-red-700' : 'bg-green-600 border-green-700';
-      // IMPORTANT: keep the fixed top-center classes so the toast stays at the top middle
-      messageBox.className = `${basePos} ${look} ${color}`;
+      messageBox.textContent = message;
+      // Keep the toast pinned top-middle and animate in
+      messageBox.className = \`\${basePos} \${look} \${color} opacity-100 scale-100\`;
       clearTimeout(showMessage._t);
       showMessage._t = setTimeout(() => {
         messageBox.classList.add('opacity-0', 'scale-0');
       }, 3000);
-    } transition-all duration-300 transform scale-100 opacity-100`;
-      clearTimeout(showMessage._t);
-      showMessage._t = setTimeout(() => messageBox.classList.add('scale-0', 'opacity-0'), 3000);
     }
 
     const cfgKeys = { owner: 'gh.owner', repo: 'gh.repo', path: 'gh.path', branch: 'gh.branch', token: 'gh.token' };
@@ -276,7 +273,7 @@
     function syncBadge(text, classes) {
       const el = document.getElementById('syncBadge');
       el.textContent = text;
-      el.className = `text-xs px-2 py-1 rounded border ${classes}`;
+      el.className = \`text-xs px-2 py-1 rounded border \${classes}\`;
     }
 
     // --- Base64 helpers (UTF-8 safe) ---
@@ -285,22 +282,22 @@
 
     // --- GitHub API ---
     function ghHeaders(token) {
-      return { 'Accept':'application/vnd.github+json','Authorization':`Bearer ${token}`,'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json' };
+      return { 'Accept':'application/vnd.github+json','Authorization':\`Bearer \${token}\`,'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json' };
     }
 
     // Extra diagnostics helpers
     async function ghGetRepo({owner, repo, token}) {
-      const url = `https://api.github.com/repos/${owner}/${repo}`;
+      const url = \`https://api.github.com/repos/\${owner}/\${repo}\`;
       const res = await fetch(url, { headers: ghHeaders(token) });
-      if (!res.ok) throw new Error(`Repo check failed: ${res.status}`);
+      if (!res.ok) throw new Error(\`Repo check failed: \${res.status}\`);
       return res.json();
     }
 
     async function ghGetBranch({owner, repo, branch, token}) {
-      const url = `https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`;
+      const url = \`https://api.github.com/repos/\${owner}/\${repo}/git/ref/heads/\${encodeURIComponent(branch)}\`;
       const res = await fetch(url, { headers: ghHeaders(token) });
       if (res.status === 404) return null;
-      if (!res.ok) throw new Error(`Branch check failed: ${res.status}`);
+      if (!res.ok) throw new Error(\`Branch check failed: \${res.status}\`);
       return res.json();
     }
 
@@ -309,7 +306,7 @@
         const repo = await ghGetRepo(cfg);
         const br = await ghGetBranch(cfg);
         if (!br) {
-          return { ok:false, msg:`404: Branch "${cfg.branch}" was not found. Repo default branch is "${repo.default_branch}". Update the Branch field to an existing branch or create it.` };
+          return { ok:false, msg:\`404: Branch "\${cfg.branch}" was not found. Repo default branch is "\${repo.default_branch}". Update the Branch field to an existing branch or create it.\` };
         }
         return { ok:true, defaultBranch: repo.default_branch };
       } catch(err){
@@ -318,10 +315,10 @@
     }
 
     async function ghGetFile({owner, repo, path, branch, token}) {
-      const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`;
+      const url = \`https://api.github.com/repos/\${owner}/\${repo}/contents/\${encodeURIComponent(path)}?ref=\${encodeURIComponent(branch)}\`;
       const res = await fetch(url, { headers: ghHeaders(token) });
       if (res.status === 404) return { contentText: null, sha: null };
-      if (!res.ok) throw new Error(`GitHub GET failed: ${res.status}`);
+      if (!res.ok) throw new Error(\`GitHub GET failed: \${res.status}\`);
       const json = await res.json();
       const contentText = fromBase64(json.content || '');
       return { contentText, sha: json.sha };
@@ -329,17 +326,17 @@
 
     // PUT with conflict retry + clearer errors
     async function ghPutFile(cfg, text, sha, messageHint='Update app data') {
-      const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${encodeURIComponent(cfg.path)}`;
-      const body = (shaToUse) => JSON.stringify({ message: `${messageHint} (${new Date().toISOString()})`, content: toBase64(text), branch: cfg.branch, ...(shaToUse ? { sha: shaToUse } : {}) });
+      const url = \`https://api.github.com/repos/\${cfg.owner}/\${cfg.repo}/contents/\${encodeURIComponent(cfg.path)}\`;
+      const body = (shaToUse) => JSON.stringify({ message: \`\${messageHint} (\${new Date().toISOString()})\`, content: toBase64(text), branch: cfg.branch, ...(shaToUse ? { sha: shaToUse } : {}) });
       const attempt = async (shaArg) => {
         const res = await fetch(url, { method: 'PUT', headers: ghHeaders(cfg.token), body: body(shaArg) });
         if (res.ok) return (await res.json()).content.sha;
         const txt = await res.text();
         if (res.status === 409) return { conflict: true, txt };
-        if (res.status === 403) throw new Error(`GitHub PUT failed: 403 (token/branch). Details: ${txt}`);
-        if (res.status === 404) throw new Error(`GitHub PUT failed: 404 (repo/branch not found, or token has no access — private repos return 404). Details: ${txt}`);
-        if (res.status === 422) throw new Error(`GitHub PUT failed: 422 (path/encoding). Details: ${txt}`);
-        throw new Error(`GitHub PUT failed: ${res.status} ${txt}`);
+        if (res.status === 403) throw new Error(\`GitHub PUT failed: 403 (token/branch). Details: \${txt}\`);
+        if (res.status === 404) throw new Error(\`GitHub PUT failed: 404 (repo/branch not found, or token has no access — private repos return 404). Details: \${txt}\`);
+        if (res.status === 422) throw new Error(\`GitHub PUT failed: 422 (path/encoding). Details: \${txt}\`);
+        throw new Error(\`GitHub PUT failed: \${res.status} \${txt}\`);
       };
       const first = await attempt(sha);
       if (first && typeof first === 'string') return first;
@@ -498,20 +495,20 @@
         const row = document.createElement('tr');
         row.className = 'bg-white border-b hover:bg-gray-50';
         row.innerHTML = `
-          <td class="px-6 py-4 text-xs font-mono">${record.id}</td>
-          <td class="px-6 py-4">${record.department}</td>
-          <td class="px-6 py-4">${record.name}</td>
-          <td class="px-6 py-4">${record.date}</td>
-          <td class="px-6 py-4">${record.duration}</td>
-          <td class="px-6 py-4">${record.shift}</td>`;
+          <td class="px-6 py-4 text-xs font-mono">\${record.id}</td>
+          <td class="px-6 py-4">\${record.department}</td>
+          <td class="px-6 py-4">\${record.name}</td>
+          <td class="px-6 py-4">\${record.date}</td>
+          <td class="px-6 py-4">\${record.duration}</td>
+          <td class="px-6 py-4">\${record.shift}</td>`;
         tableBody.appendChild(row);
       });
     }
 
     function toCSV(records){
-      let csv = 'Record ID,Department,Name,Date,Duration,Shift\n';
+      let csv = 'Record ID,Department,Name,Date,Duration,Shift\\n';
       records.forEach(r => {
-        csv += `${r.id},"${r.department}","${r.name}","${r.date}","${r.duration}","${r.shift}"\n`;
+        csv += \`\${r.id},\"\${r.department}\",\"\${r.name}\",\"\${r.date}\",\"\${r.duration}\",\"\${r.shift}\"\n\`;
       });
       return csv;
     }
@@ -528,7 +525,7 @@
       updateRemoveStaffDropdown();
     }
 
-    // Event: Settings open/close (guarded if elements not found)
+    // Event: Settings open/close
     if (openSettingsBtn) openSettingsBtn.addEventListener('click', () => settingsPanel.classList.remove('hidden'));
     if (closeSettingsBtn) closeSettingsBtn.addEventListener('click', () => settingsPanel.classList.add('hidden'));
 
@@ -586,7 +583,7 @@
       }
     });
 
-    // Event: Header "Connect" button — uses live form values if present, else session
+    // Event: Header "Connect" button
     if (connectNowBtn) connectNowBtn.addEventListener('click', async () => {
       const formCfg = {
         owner: ghOwner.value.trim(),
@@ -650,7 +647,7 @@
       const newDuration = parseInt(duration.split(' ')[0], 10);
       const remaining = Math.max(0, 2 - hoursTaken);
       if (hoursTaken + newDuration > 2) {
-        showMessage(`Monthly limit is 2 hours. ${name} has ${remaining} hour(s) left for ${monthYear}.`, 'error');
+        showMessage(\`Monthly limit is 2 hours. \${name} has \${remaining} hour(s) left for \${monthYear}.\`, 'error');
         return;
       }
 
@@ -723,9 +720,9 @@
       arr.push(newName);
       const nextData = { ...dataCache, staff: lists };
 
-      if (await saveAllToGitHub(nextData, `Add staff "${newName}" to ${department}`)) {
+      if (await saveAllToGitHub(nextData, \`Add staff "\${newName}" to \${department}\`)) {
         dataCache = nextData;
-        showMessage(`${newName} added to ${department} and synced to GitHub.`);
+        showMessage(\`\${newName} added to \${department} and synced to GitHub.\`);
         if (document.getElementById('department').value === department) updateNamesDropdown();
         updateRemoveStaffDropdown();
         newStaffNameInput.value = '';
@@ -754,9 +751,7 @@
     function openModal() {
       confirmModal.classList.remove('hidden');
       confirmModal.setAttribute('aria-hidden', 'false');
-      // Focus the primary action
       setTimeout(() => modalConfirm.focus(), 0);
-      // ESC support
       document.addEventListener('keydown', onEscClose);
     }
     function closeModal() {
@@ -789,18 +784,17 @@
       lists[dept] = arr;
 
       const nextData = { ...dataCache, staff: lists };
-      const ok = await saveAllToGitHub(nextData, `Remove staff "${name}" from ${dept}`);
+      const ok = await saveAllToGitHub(nextData, \`Remove staff "\${name}" from \${dept}\`);
       if (ok) {
         dataCache = nextData;
         updateRemoveStaffDropdown();
         if (departmentDropdown.value === dept) updateNamesDropdown();
-        showMessage(`${name} removed from ${dept} and synced to GitHub.`);
+        showMessage(\`\${name} removed from \${dept} and synced to GitHub.\`);
       }
       closeModal();
       pendingRemove = null;
     });
 
-    // Boot
     // Boot safely after DOM is ready
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => bootstrap().catch(console.error));
