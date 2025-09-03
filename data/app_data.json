@@ -136,6 +136,15 @@
       "duration": "2 hours",
       "shift": "Evening",
       "month_year": "2025-09"
+    },
+    {
+      "id": "6404fbdf-f0c5-4ac8-bd21-33bf79a9a1c1",
+      "department": "Collection",
+      "name": "Nimesh Perera",
+      "date": "2025-09-04",
+      "duration": "1 hour",
+      "shift": "Evening",
+      "month_year": "2025-09"
     }
   ]
 }
