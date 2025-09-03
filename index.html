@@ -1,1 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Short Leave Tracking System</title>
+  <meta name="description" content="Short Leave tracker that saves staff lists and leave records into a single file in a GitHub repo (via GitHub REST API)." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .kbd{border:1px solid #e5e7eb;border-bottom-width:3px;border-radius:.375rem;padding:.125rem .375rem;font-size:.75rem;}
+  </style>
+</head>
+<body class="bg-gray-100 font-sans p-4 min-h-screen flex items-center justify-center">
+  <!-- Message Box -->
+  <div id="messageBox" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 p-4 rounded-md transition-all duration-300 transform scale-0 opacity-0"></div>
 
+  <div class="container mx-auto p-6 md:p-8 bg-white rounded-lg shadow-xl max-w-5xl">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-bold text-gray-800">Short Leave Tracking System</h1>
+        <p class="text-gray-500 text-sm">Staff lists & leave records are saved to a single JSON file in your GitHub repo.</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="syncBadge" class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 border">Not connected</span>
+        <button id="openSettings" class="bg-gray-800 text-white px-4 py-2 rounded-md font-semibold hover:bg-black">Settings</button>
+      </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div id="settingsPanel" class="hidden mb-6 border rounded-lg">
+      <div class="p-4 bg-gray-50 border-b flex items-center justify-between">
+        <h2 class="text-lg font-semibold">GitHub Settings</h2>
+        <button id="closeSettings" class="text-sm text-gray-600 hover:text-gray-900">Close</button>
+      </div>
+      <form id="settingsForm" class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Owner / Org</label>
+          <input id="ghOwner" class="mt-1 w-full rounded-md border-gray-300 p-2" placeholder="e.g. niroshanmahendran" required />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Repository</label>
+          <input id="ghRepo" class="mt-1 w-full rounded-md border-gray-300 p-2" placeholder="e.g. short-leave-tracker" required />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Branch</label>
+          <input id="ghBranch" class="mt-1 w-full rounded-md border-gray-300 p-2" placeholder="e.g. main" value="main" required />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">App data file path in repo</label>
+          <input id="ghPath" class="mt-1 w-full rounded-md border-gray-300 p-2" placeholder="e.g. data/app_data.json" value="data/app_data.json" required />
+        </div>
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700">GitHub Personal Access Token (PAT)</label>
+          <input id="ghToken" type="password" class="mt-1 w-full rounded-md border-gray-300 p-2" placeholder="Fine-grained token with contents:read,contents:write" required />
+          <p class="text-xs text-gray-500 mt-1">Your token is used only in this browser and stored in <strong>sessionStorage</strong> (cleared on browser/tab close). Do <strong>not</strong> commit it anywhere.</p>
+        </div>
+        <div class="md:col-span-2 flex justify-end gap-2">
+          <button type="button" id="testConnection" class="px-4 py-2 rounded bg-gray-100 border hover:bg-gray-200">Test</button>
+          <button type="submit" class="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700">Save Settings</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Add Leave Record Form -->
+    <div class="mb-8 p-6 bg-gray-50 rounded-lg shadow-inner">
+      <h2 class="text-2xl font-semibold text-gray-700 mb-4">Add a New Leave Record</h2>
+      <form id="leaveForm" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label for="department" class="block text-sm font-medium text-gray-700">Department</label>
+          <select id="department" name="department" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" required>
+            <option value="">-- Select --</option>
+            <option value="Verification">Verification</option>
+            <option value="Collection">Collection</option>
+            <option value="CS|TS|RPD">CS|TS|RPD</option>
+            <option value="Quality Control">Quality Control</option>
+          </select>
+        </div>
+        <div>
+          <label for="name" class="block text-sm font-medium text-gray-700">Name</label>
+          <select id="name" name="name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" required>
+            <option value="">-- Select --</option>
+          </select>
+        </div>
+        <div>
+          <label for="date" class="block text-sm font-medium text-gray-700">Date</label>
+          <input type="date" id="date" name="date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" required />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Duration (hours)</label>
+          <div class="mt-2 space-y-2">
+            <div class="flex items-center"><input id="duration-1" name="leaveDuration" type="radio" value="1 hour" class="h-4 w-4 text-indigo-600 border-gray-300" required /><label for="duration-1" class="ml-2 block text-sm text-gray-900">1 hour</label></div>
+            <div class="flex items-center"><input id="duration-2" name="leaveDuration" type="radio" value="2 hours" class="h-4 w-4 text-indigo-600 border-gray-300" required /><label for="duration-2" class="ml-2 block text-sm text-gray-900">2 hours</label></div>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Shift</label>
+          <div class="mt-2 space-y-2">
+            <div class="flex items-center"><input id="shift-morning" name="shift" type="radio" value="Morning" class="h-4 w-4 text-indigo-600 border-gray-300" required /><label for="shift-morning" class="ml-2 block text-sm text-gray-900">Morning</label></div>
+            <div class="flex items-center"><input id="shift-evening" name="shift" type="radio" value="Evening" class="h-4 w-4 text-indigo-600 border-gray-300" required /><label for="shift-evening" class="ml-2 block text-sm text-gray-900">Evening</label></div>
+          </div>
+        </div>
+        <div class="col-span-1 md:col-span-3 flex flex-wrap justify-end gap-2">
+          <button type="button" id="exportButton" class="bg-gray-600 text-white px-6 py-2 rounded-md font-semibold hover:bg-gray-700">Export CSV</button>
+          <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded-md font-semibold hover:bg-indigo-700">Add Record</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Leave Records Table -->
+    <div class="overflow-x-auto relative shadow-md sm:rounded-lg">
+      <h2 class="text-2xl font-semibold text-gray-700 mb-4 px-2">Leave Records</h2>
+      <table class="w-full text-sm text-left text-gray-700">
+        <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+          <tr>
+            <th scope="col" class="px-6 py-3">Record ID</th>
+            <th scope="col" class="px-6 py-3">Department</th>
+            <th scope="col" class="px-6 py-3">Name</th>
+            <th scope="col" class="px-6 py-3">Date</th>
+            <th scope="col" class="px-6 py-3">Duration</th>
+            <th scope="col" class="px-6 py-3">Shift</th>
+          </tr>
+        </thead>
+        <tbody id="leaveTableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Delete Record Form -->
+    <div class="mt-8 p-6 bg-gray-50 rounded-lg shadow-inner">
+      <h2 class="text-2xl font-semibold text-gray-700 mb-4">Delete a Record</h2>
+      <p class="text-sm text-gray-500 mb-4">Use the Record ID from the table above.</p>
+      <form id="deleteForm" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label for="deleteRecordId" class="block text-sm font-medium text-gray-700">Record ID</label>
+          <input type="text" id="deleteRecordId" name="deleteRecordId" class="mt-1 block w-full rounded-md border-gray-300 p-2" required />
+        </div>
+        <div>
+          <label for="deleteUsername" class="block text-sm font-medium text-gray-700">Username</label>
+          <input type="text" id="deleteUsername" name="deleteUsername" class="mt-1 block w-full rounded-md border-gray-300 p-2" required />
+        </div>
+        <div>
+          <label for="deletePassword" class="block text-sm font-medium text-gray-700">Password</label>
+          <input type="password" id="deletePassword" name="deletePassword" class="mt-1 block w-full rounded-md border-gray-300 p-2" required />
+        </div>
+        <div class="col-span-1 md:col-span-3 flex justify-end">
+          <button type="submit" class="bg-red-600 text-white px-6 py-2 rounded-md font-semibold hover:bg-red-700">Delete Record</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Add New Staff Form -->
+    <div class="mt-8 p-6 bg-gray-50 rounded-lg shadow-inner">
+      <h2 class="text-2xl font-semibold text-gray-700 mb-4">Add a New Staff Member</h2>
+      <form id="addStaffForm" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label for="addStaffDepartment" class="block text-sm font-medium text-gray-700">Department</label>
+          <select id="addStaffDepartment" name="addStaffDepartment" class="mt-1 block w-full rounded-md border-gray-300 p-2" required>
+            <option value="">-- Select --</option>
+            <option value="Verification">Verification</option>
+            <option value="Collection">Collection</option>
+            <option value="CS|TS|RPD">CS|TS|RPD</option>
+            <option value="Quality Control">Quality Control</option>
+          </select>
+        </div>
+        <div>
+          <label for="newStaffName" class="block text-sm font-medium text-gray-700">Staff Name</label>
+          <input type="text" id="newStaffName" name="newStaffName" class="mt-1 block w-full rounded-md border-gray-300 p-2" required />
+        </div>
+        <div class="col-span-1 md:col-span-3 flex justify-end">
+          <button type="submit" class="bg-gray-600 text-white px-6 py-2 rounded-md font-semibold hover:bg-gray-700">Add Staff</button>
+        </div>
+      </form>
+      <p class="text-xs text-gray-500 mt-3">Staff lists are synced to GitHub (single file). Existing leave records remain unchanged.</p>
+    </div>
+
+    <!-- Remove Staff Form -->
+    <div class="mt-8 p-6 bg-gray-50 rounded-lg shadow-inner">
+      <h2 class="text-2xl font-semibold text-gray-700 mb-4">Remove a Staff Member</h2>
+      <form id="removeStaffForm" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label for="removeStaffDepartment" class="block text-sm font-medium text-gray-700">Department</label>
+          <select id="removeStaffDepartment" name="removeStaffDepartment" class="mt-1 block w-full rounded-md border-gray-300 p-2" required>
+            <option value="">-- Select --</option>
+            <option value="Verification">Verification</option>
+            <option value="Collection">Collection</option>
+            <option value="CS|TS|RPD">CS|TS|RPD</option>
+            <option value="Quality Control">Quality Control</option>
+          </select>
+        </div>
+        <div>
+          <label for="removeStaffName" class="block text-sm font-medium text-gray-700">Staff Name</label>
+          <select id="removeStaffName" name="removeStaffName" class="mt-1 block w-full rounded-md border-gray-300 p-2" required>
+            <option value="">-- Select a department first --</option>
+          </select>
+        </div>
+        <div class="col-span-1 md:col-span-3 flex justify-end">
+          <button type="submit" class="bg-red-600 text-white px-6 py-2 rounded-md font-semibold hover:bg-red-700">Remove Staff</button>
+        </div>
+      </form>
+      <p class="text-xs text-gray-500 mt-3">Removal updates the staff list in GitHub. It does <strong>not</strong> delete existing leave records.</p>
+    </div>
+  </div>
+
+  <!-- Tailwind Modal: Remove Staff Confirmation -->
+  <div id="confirmModal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
+    <div id="modalOverlay" class="absolute inset-0 bg-black/40"></div>
+    <div class="absolute inset-0 flex items-center justify-center p-4">
+      <div class="w-full max-w-md rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
+        <div class="px-6 pt-6">
+          <div class="flex items-start gap-3">
+            <div class="shrink-0 mt-1">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-600" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 5v6h-2V7h2zm0 8v2h-2v-2h2z"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">Remove Staff Member?</h3>
+              <p class="mt-1 text-sm text-gray-600">
+                You’re about to remove <span id="modalName" class="font-semibold text-gray-900"></span> from
+                <span id="modalDept" class="font-semibold text-gray-900"></span>.
+              </p>
+              <p class="mt-1 text-xs text-gray-500">
+                This updates the staff list in GitHub and will <strong>not</strong> delete existing leave records.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="px-6 pb-6 pt-4 flex items-center justify-end gap-2">
+          <button id="modalCancel" class="px-4 py-2 rounded-md border bg-white text-gray-700 hover:bg-gray-50">Cancel</button>
+          <button id="modalConfirm" class="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700">Remove</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Utilities ---
+    function showMessage(message, type = 'info') {
+      const messageBox = document.getElementById('messageBox');
+      messageBox.textContent = message;
+      messageBox.className = `p-4 rounded-md mt-4 text-center text-white ${type === 'error' ? 'bg-red-500' : 'bg-green-600'} transition-all duration-300 transform scale-100 opacity-100`;
+      clearTimeout(showMessage._t);
+      showMessage._t = setTimeout(() => messageBox.classList.add('scale-0', 'opacity-0'), 3000);
+    }
+
+    const cfgKeys = { owner: 'gh.owner', repo: 'gh.repo', path: 'gh.path', branch: 'gh.branch', token: 'gh.token' };
+
+    function saveCfgToSession(cfg) {
+      sessionStorage.setItem(cfgKeys.owner, cfg.owner || '');
+      sessionStorage.setItem(cfgKeys.repo, cfg.repo || '');
+      sessionStorage.setItem(cfgKeys.path, cfg.path || '');
+      sessionStorage.setItem(cfgKeys.branch, cfg.branch || '');
+      sessionStorage.setItem(cfgKeys.token, cfg.token || '');
+    }
+
+    function readCfgFromSession() {
+      return {
+        owner: sessionStorage.getItem(cfgKeys.owner) || '',
+        repo: sessionStorage.getItem(cfgKeys.repo) || '',
+        path: sessionStorage.getItem(cfgKeys.path) || 'data/app_data.json',
+        branch: sessionStorage.getItem(cfgKeys.branch) || 'main',
+        token: sessionStorage.getItem(cfgKeys.token) || ''
+      };
+    }
+
+    function syncBadge(text, color) {
+      const el = document.getElementById('syncBadge');
+      el.textContent = text;
+      el.className = `text-xs px-2 py-1 rounded border ${color}`;
+    }
+
+    // --- Base64 helpers (UTF-8 safe) ---
+    function toBase64(str) { const utf8 = new TextEncoder().encode(str); let bin=''; utf8.forEach(b=>bin+=String.fromCharCode(b)); return btoa(bin); }
+    function fromBase64(b64) { const bin = atob(b64); const bytes = Uint8Array.from(bin, c=>c.charCodeAt(0)); return new TextDecoder().decode(bytes); }
+
+    // --- GitHub API ---
+    function ghHeaders(token) {
+      return { 'Accept':'application/vnd.github+json','Authorization':`Bearer ${token}`,'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json' };
+    }
+
+    async function ghGetFile({owner, repo, path, branch, token}) {
+      const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`;
+      const res = await fetch(url, { headers: ghHeaders(token) });
+      if (res.status === 404) return { contentText: null, sha: null };
+      if (!res.ok) throw new Error(`GitHub GET failed: ${res.status}`);
+      const json = await res.json();
+      const contentText = fromBase64(json.content || '');
+      return { contentText, sha: json.sha };
+    }
+
+    // PUT with conflict retry + clearer errors
+    async function ghPutFile(cfg, text, sha, messageHint='Update app data') {
+      const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${encodeURIComponent(cfg.path)}`;
+      const body = (shaToUse) => JSON.stringify({ message: `${messageHint} (${new Date().toISOString()})`, content: toBase64(text), branch: cfg.branch, ...(shaToUse ? { sha: shaToUse } : {}) });
+      const attempt = async (shaArg) => {
+        const res = await fetch(url, { method: 'PUT', headers: ghHeaders(cfg.token), body: body(shaArg) });
+        if (res.ok) return (await res.json()).content.sha;
+        const txt = await res.text();
+        if (res.status === 409) return { conflict: true, txt };
+        if (res.status === 403) throw new Error(`GitHub PUT failed: 403 (token/branch). Details: ${txt}`);
+        if (res.status === 422) throw new Error(`GitHub PUT failed: 422 (path/encoding). Details: ${txt}`);
+        throw new Error(`GitHub PUT failed: ${res.status} ${txt}`);
+      };
+      const first = await attempt(sha);
+      if (first && typeof first === 'string') return first;
+      if (first && first.conflict) {
+        const { sha: latestSha } = await ghGetFile(cfg);
+        if (!latestSha) throw new Error('Conflict detected but file SHA could not be refreshed.');
+        const second = await attempt(latestSha);
+        if (typeof second === 'string') return second;
+        throw new Error('Second attempt failed due to ongoing conflicts.');
+      }
+      throw new Error('Unexpected save flow.');
+    }
+
+    // --- Default Data ---
+    const defaultStaffLists = {
+      'Verification': ['Ruwanjana Dissanayaka','Arunali Vihanga','Praveen Thrindu','Rahul Krishnan','Sherani Jewanandan','Menaka Lakmali','Dilanka Ranali','Dewni Pabasari','Gimhan Dananjana','Sumithra Anthony','Sachini Manjula','Vijini Lakshika','Tashani Ayodya','Umasha Tekmi','Iruni Nethmini','Akashara Jeraj','Ashani Nawodya'],
+      'Collection': ['Dilshan Madhuwantha','Nimesh Perera','Iresha Dilhani','Asanka Nash','Pasindu Premalal','Pavithra Thangarajah','Preeni Sanoja','Varuni Lakshani','Suresh Jadeesha','Nipuni Weerakoon','Chathura Kosala','Sandeepa Lakruwan','Lahiru Lakmal','Eshan Shashika','Venura Lakshitha','Thanusha Deshani','Thanoj Vishman','Lehan Hansaja','Hasini Pituwala','Malinda Chathuranga','Vihaga Makumbura','Akalanka Fernando','Dulan Charuka','Heshan Kalhara','Prarthana Dewmini','Kavindu Kalhara','Ruchini Navanjana','Sanduni Kaushalya','Chantuka Malisha','Thilina Hashan','Dinusha Dasanayaka','Amashi Sadamini','Naduni Kaveesha','Sandali Nisansala','Chathuni Vimarsha','Sasantha Udesh','Raveesha Nethmini','Nimanthi Shamika','Lakshan Perera','Imalsha Perera','Gihan Pamodh','Harith Shenun','Nipun Sudharaka','Avishka Shalinda','Niroshan Buddika','Deshan Jayaweera','Kalindu Sachith','Chathurangi Baddevithana','Sandali Neththara','Sanduni Rupika','Amandi Upeksha','Chamilka Oshadha','Niloshan Anthany','Maleesha Kalhara','Buddini Darsha','Methdinu Jayasinhe','Ishara Maduwanthi'],
+      'CS|TS|RPD': ['Gayanthi Madhuwanthi','Noyeli Yalindi','Fathima Sasmiya','Jegan Gayathri','Chathurya Madhavi','Ridmi Jayasekara','Ama Nuwanthi','Saduni Nethmini','Ama Kavindi','Nilushika Prasadini','Rukshan Jesudasan','Nawodya Udayangana','Dulan Pasindu','Kavindu Prasath','Maheshwaran Madushan','Oshadi Wanasinghe','Safiya Jaan','Ishan Rajapaksha','Mohamed Aslam','Prabuddhi Malshani','Neha Kottage'],
+      'Quality Control': ['Amanda Udeshani','Samadhi Lanka','Kaveesha Dias','Sandhanam Kavishanth']
+    };
+
+    // --- App State (single file) ---
+    // dataCache schema: { staff: {department: string[]}, records: Array<{id, department, name, date, duration, shift, month_year}> }
+    let cachedSha = null;
+    let dataCache = { staff: defaultStaffLists, records: [] };
+
+    // --- Load/Save whole document ---
+    async function loadAllFromGitHub() {
+      const cfg = readCfgFromSession();
+      if (!cfg.owner || !cfg.repo || !cfg.path || !cfg.branch || !cfg.token) {
+        syncBadge('Not connected', 'bg-yellow-50 text-yellow-700 border-yellow-300');
+        return { staff: defaultStaffLists, records: [] };
+      }
+      try {
+        const { contentText, sha } = await ghGetFile(cfg);
+        cachedSha = sha;
+        if (!contentText) {
+          syncBadge('Connected (file will be created)', 'bg-blue-50 text-blue-700 border-blue-300');
+          return { staff: defaultStaffLists, records: [] };
+        }
+        const parsed = JSON.parse(contentText);
+        const staff = parsed?.staff && typeof parsed.staff === 'object' ? parsed.staff : defaultStaffLists;
+        const records = Array.isArray(parsed?.records) ? parsed.records : [];
+        syncBadge('Connected ✓', 'bg-green-50 text-green-700 border-green-300');
+        return { staff, records };
+      } catch (e) {
+        console.error(e);
+        showMessage('Failed to load app data from GitHub. Using defaults locally.', 'error');
+        syncBadge('Error', 'bg-red-50 text-red-700 border-red-300');
+        return { staff: defaultStaffLists, records: [] };
+      }
+    }
+
+    async function saveAllToGitHub(nextData, messageHint) {
+      const cfg = readCfgFromSession();
+      if (!cfg.token) { showMessage('Missing GitHub token in Settings.', 'error'); return false; }
+      try {
+        const text = JSON.stringify(nextData, null, 2);
+        const newSha = await ghPutFile(cfg, text, cachedSha, messageHint);
+        cachedSha = newSha;
+        syncBadge('Connected ✓', 'bg-green-50 text-green-700 border-green-300');
+        return true;
+      } catch (e) {
+        console.error(e);
+        showMessage('Failed to save app data to GitHub (see console).', 'error');
+        syncBadge('Error', 'bg-red-50 text-red-700 border-red-300');
+        return false;
+      }
+    }
+
+    // --- DOM Elements ---
+    const departmentDropdown = document.getElementById('department');
+    const nameDropdown = document.getElementById('name');
+    const leaveForm = document.getElementById('leaveForm');
+    const tableBody = document.getElementById('leaveTableBody');
+    const exportButton = document.getElementById('exportButton');
+    const deleteForm = document.getElementById('deleteForm');
+
+    const addStaffForm = document.getElementById('addStaffForm');
+    const addStaffDepartmentDropdown = document.getElementById('addStaffDepartment');
+    const newStaffNameInput = document.getElementById('newStaffName');
+
+    const removeStaffForm = document.getElementById('removeStaffForm');
+    const removeStaffDepartmentDropdown = document.getElementById('removeStaffDepartment');
+    const removeStaffNameDropdown = document.getElementById('removeStaffName');
+
+    const openSettingsBtn = document.getElementById('openSettings');
+    const closeSettingsBtn = document.getElementById('closeSettings');
+    const settingsPanel = document.getElementById('settingsPanel');
+    const settingsForm = document.getElementById('settingsForm');
+
+    const ghOwner = document.getElementById('ghOwner');
+    const ghRepo = document.getElementById('ghRepo');
+    const ghBranch = document.getElementById('ghBranch');
+    const ghPath = document.getElementById('ghPath');
+    const ghToken = document.getElementById('ghToken');
+    const testConnection = document.getElementById('testConnection');
+
+    // Modal elements & state
+    const confirmModal = document.getElementById('confirmModal');
+    const modalOverlay = document.getElementById('modalOverlay');
+    const modalName = document.getElementById('modalName');
+    const modalDept = document.getElementById('modalDept');
+    const modalCancel = document.getElementById('modalCancel');
+    const modalConfirm = document.getElementById('modalConfirm');
+
+    let pendingRemove = null; // { dept, name }
+
+    // --- UI helpers ---
+    function updateNamesDropdown() {
+      const lists = dataCache.staff || {};
+      const selectedDepartment = departmentDropdown.value;
+      nameDropdown.innerHTML = '<option value="">-- Select --</option>';
+      (lists[selectedDepartment] || []).forEach(name => {
+        const option = document.createElement('option');
+        option.value = name; option.textContent = name;
+        nameDropdown.appendChild(option);
+      });
+    }
+
+    function updateRemoveStaffDropdown() {
+      const lists = dataCache.staff || {};
+      const dept = removeStaffDepartmentDropdown.value;
+      const names = (lists[dept] || []).slice().sort((a,b)=>a.localeCompare(b));
+      removeStaffNameDropdown.innerHTML = '';
+      if (!dept) {
+        removeStaffNameDropdown.innerHTML = '<option value="">-- Select a department first --</option>';
+        return;
+      }
+      if (!names.length) {
+        removeStaffNameDropdown.innerHTML = '<option value="">(No staff in this department)</option>';
+        return;
+      }
+      removeStaffNameDropdown.innerHTML = '<option value="">-- Select --</option>';
+      names.forEach(n => {
+        const opt = document.createElement('option');
+        opt.value = n; opt.textContent = n;
+        removeStaffNameDropdown.appendChild(opt);
+      });
+    }
+
+    function renderTable(records) {
+      tableBody.innerHTML = '';
+      if (!records.length) {
+        const noDataRow = document.createElement('tr');
+        const noDataCell = document.createElement('td');
+        noDataCell.colSpan = 6;
+        noDataCell className = 'text-center py-4 text-gray-500 italic';
+        noDataCell.textContent = 'No leave records found. Add one above!';
+        noDataRow.appendChild(noDataCell);
+        tableBody.appendChild(noDataRow);
+        return;
+      }
+      records.forEach(record => {
+        const row = document.createElement('tr');
+        row.className = 'bg-white border-b hover:bg-gray-50';
+        row.innerHTML = `
+          <td class="px-6 py-4 text-xs font-mono">${record.id}</td>
+          <td class="px-6 py-4">${record.department}</td>
+          <td class="px-6 py-4">${record.name}</td>
+          <td class="px-6 py-4">${record.date}</td>
+          <td class="px-6 py-4">${record.duration}</td>
+          <td class="px-6 py-4">${record.shift}</td>`;
+        tableBody.appendChild(row);
+      });
+    }
+
+    function toCSV(records){
+      let csv = 'Record ID,Department,Name,Date,Duration,Shift\n';
+      records.forEach(r => {
+        csv += `${r.id},"${r.department}","${r.name}","${r.date}","${r.duration}","${r.shift}"\n`;
+      });
+      return csv;
+    }
+
+    // --- Bootstrap ---
+    async function bootstrap() {
+      const cfg = readCfgFromSession();
+      ghOwner.value = cfg.owner; ghRepo.value = cfg.repo; ghBranch.value = cfg.branch;
+      ghPath.value = cfg.path; ghToken.value = cfg.token;
+
+      dataCache = await loadAllFromGitHub();
+      renderTable(dataCache.records);
+      updateNamesDropdown();
+      updateRemoveStaffDropdown();
+    }
+
+    // Event: Settings open/close
+    openSettingsBtn.addEventListener('click', () => settingsPanel.classList.remove('hidden'));
+    closeSettingsBtn.addEventListener('click', () => settingsPanel.classList.add('hidden'));
+
+    // Event: Save settings
+    settingsForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const cfg = {
+        owner: ghOwner.value.trim(),
+        repo: ghRepo.value.trim(),
+        branch: ghBranch.value.trim() || 'main',
+        path: ghPath.value.trim(),
+        token: ghToken.value.trim()
+      };
+      saveCfgToSession(cfg);
+      showMessage('Settings saved to session.');
+      dataCache = await loadAllFromGitHub();
+      renderTable(dataCache.records);
+      updateNamesDropdown();
+      updateRemoveStaffDropdown();
+    });
+
+    // Event: Test connection (single file)
+    testConnection.addEventListener('click', async () => {
+      try {
+        const cfg = readCfgFromSession();
+        const file = await ghGetFile(cfg);
+        const msg = file.contentText ? 'Connected! App data file exists.' : 'Connected! File will be created on first save.';
+        showMessage(msg);
+        syncBadge('Connected ✓', 'bg-green-50 text-green-700 border-green-300');
+      } catch (e) {
+        console.error(e);
+        showMessage('Connection failed. Check repo/branch/path/token.', 'error');
+        syncBadge('Error', 'bg-red-50 text-red-700 border-red-300');
+      }
+    });
+
+    // Event: Department change for add-record form
+    departmentDropdown.addEventListener('change', updateNamesDropdown);
+
+    // Add record
+    leaveForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('name').value;
+      const department = document.getElementById('department').value;
+      const date = document.getElementById('date').value;
+      const duration = document.querySelector('input[name="leaveDuration"]:checked')?.value;
+      const shift = document.querySelector('input[name="shift"]:checked')?.value;
+
+      if (!name || !department || !date || !duration || !shift) {
+        showMessage('Please fill out all fields.', 'error');
+        return;
+      }
+
+      const monthYear = date.substring(0, 7);
+      const hoursTaken = dataCache.records
+        .filter(r => r.name === name && r.month_year === monthYear)
+        .reduce((t, r) => t + parseInt(r.duration.split(' ')[0], 10), 0);
+      const newDuration = parseInt(duration.split(' ')[0], 10);
+      const remaining = Math.max(0, 2 - hoursTaken);
+      if (hoursTaken + newDuration > 2) {
+        showMessage(`Monthly limit is 2 hours. ${name} has ${remaining} hour(s) left for ${monthYear}.`, 'error');
+        return;
+      }
+
+      const newRecord = { id: (crypto?.randomUUID?.() || String(Date.now())), department, name, date, duration, shift, month_year: monthYear };
+      const nextData = { ...dataCache, records: [...dataCache.records, newRecord] };
+
+      if (await saveAllToGitHub(nextData, 'Add leave record')) {
+        dataCache = nextData;
+        renderTable(dataCache.records);
+        leaveForm.reset();
+        showMessage('Leave record added and saved to GitHub!');
+      }
+    });
+
+    // Delete record
+    deleteForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('deleteUsername').value;
+      const password = document.getElementById('deletePassword').value;
+      const recordIdToDelete = document.getElementById('deleteRecordId').value.trim();
+
+      if (username !== 'admin' || password !== 'damin') {
+        showMessage('Invalid username or password.', 'error');
+        return;
+      }
+      if (!recordIdToDelete) {
+        showMessage('Please enter a Record ID to delete.', 'error');
+        return;
+      }
+
+      const nextRecords = dataCache.records.filter(r => r.id !== recordIdToDelete);
+      if (nextRecords.length === dataCache.records.length) {
+        showMessage('Record not found. Please check the ID.', 'error');
+        return;
+      }
+
+      const nextData = { ...dataCache, records: nextRecords };
+      if (await saveAllToGitHub(nextData, 'Delete leave record')) {
+        dataCache = nextData;
+        renderTable(dataCache.records);
+        showMessage('Leave record deleted and saved to GitHub!');
+      }
+    });
+
+    // Export CSV (client side only)
+    exportButton.addEventListener('click', () => {
+      const blob = new Blob([toCSV(dataCache.records)], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'leave_records.csv';
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
+      showMessage('CSV exported!');
+    });
+
+    // Add staff (sync to GitHub)
+    addStaffForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const department = addStaffDepartmentDropdown.value;
+      const newName = newStaffNameInput.value.trim();
+
+      if (!department || !newName) {
+        showMessage('Please select a department and enter a name.', 'error');
+        return;
+      }
+
+      const lists = JSON.parse(JSON.stringify(dataCache.staff || {}));
+      const arr = lists[department] || (lists[department] = []);
+      if (arr.includes(newName)) { showMessage('This staff member already exists in the selected department.', 'error'); return; }
+
+      arr.push(newName);
+      const nextData = { ...dataCache, staff: lists };
+
+      if (await saveAllToGitHub(nextData, `Add staff "${newName}" to ${department}`)) {
+        dataCache = nextData;
+        showMessage(`${newName} added to ${department} and synced to GitHub.`);
+        if (document.getElementById('department').value === department) updateNamesDropdown();
+        updateRemoveStaffDropdown();
+        newStaffNameInput.value = '';
+      }
+    });
+
+    // --- Remove staff flow with Tailwind modal ---
+    removeStaffDepartmentDropdown.addEventListener('change', updateRemoveStaffDropdown);
+    removeStaffForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const dept = removeStaffDepartmentDropdown.value;
+      const name = removeStaffNameDropdown.value;
+
+      if (!dept || !name) {
+        showMessage('Please select a department and staff member to remove.', 'error');
+        return;
+      }
+
+      // Open modal with details
+      pendingRemove = { dept, name };
+      modalName.textContent = name;
+      modalDept.textContent = dept;
+      openModal();
+    });
+
+    function openModal() {
+      confirmModal.classList.remove('hidden');
+      confirmModal.setAttribute('aria-hidden', 'false');
+      // Focus the primary action
+      setTimeout(() => modalConfirm.focus(), 0);
+      // ESC support
+      document.addEventListener('keydown', onEscClose);
+    }
+    function closeModal() {
+      confirmModal.classList.add('hidden');
+      confirmModal.setAttribute('aria-hidden', 'true');
+      document.removeEventListener('keydown', onEscClose);
+    }
+    function onEscClose(e) {
+      if (e.key === 'Escape') closeModal();
+    }
+
+    modalOverlay.addEventListener('click', closeModal);
+    modalCancel.addEventListener('click', closeModal);
+
+    modalConfirm.addEventListener('click', async () => {
+      if (!pendingRemove) return;
+      const { dept, name } = pendingRemove;
+
+      const lists = JSON.parse(JSON.stringify(dataCache.staff || {}));
+      const arr = lists[dept] || [];
+      const idx = arr.indexOf(name);
+      if (idx === -1) {
+        showMessage('That staff member was not found in the selected department.', 'error');
+        closeModal();
+        pendingRemove = null;
+        return;
+      }
+
+      arr.splice(idx, 1);
+      lists[dept] = arr;
+
+      const nextData = { ...dataCache, staff: lists };
+      const ok = await saveAllToGitHub(nextData, `Remove staff "${name}" from ${dept}`);
+      if (ok) {
+        dataCache = nextData;
+        updateRemoveStaffDropdown();
+        if (departmentDropdown.value === dept) updateNamesDropdown();
+        showMessage(`${name} removed from ${dept} and synced to GitHub.`);
+      }
+      closeModal();
+      pendingRemove = null;
+    });
+
+    // Boot
+    bootstrap();
+  </script>
+</body>
+</html>
