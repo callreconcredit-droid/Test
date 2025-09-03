@@ -201,6 +201,38 @@
     </div>
   </div>
 
+  <!-- Tailwind Modal: Remove Staff Confirmation -->
+  <div id="confirmModal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
+    <div id="modalOverlay" class="absolute inset-0 bg-black/40"></div>
+    <div class="absolute inset-0 flex items-center justify-center p-4">
+      <div class="w-full max-w-md rounded-2xl bg-white shadow-2xl ring-1 ring-black/5">
+        <div class="px-6 pt-6">
+          <div class="flex items-start gap-3">
+            <div class="shrink-0 mt-1">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-600" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 5v6h-2V7h2zm0 8v2h-2v-2h2z"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">Remove Staff Member?</h3>
+              <p class="mt-1 text-sm text-gray-600">
+                You’re about to remove <span id="modalName" class="font-semibold text-gray-900"></span> from
+                <span id="modalDept" class="font-semibold text-gray-900"></span>.
+              </p>
+              <p class="mt-1 text-xs text-gray-500">
+                This updates the staff list in GitHub and will <strong>not</strong> delete existing leave records.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="px-6 pb-6 pt-4 flex items-center justify-end gap-2">
+          <button id="modalCancel" class="px-4 py-2 rounded-md border bg-white text-gray-700 hover:bg-gray-50">Cancel</button>
+          <button id="modalConfirm" class="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700">Remove</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // --- Utilities ---
     function showMessage(message, type = 'info') {
@@ -211,9 +243,7 @@
       showMessage._t = setTimeout(() => messageBox.classList.add('scale-0', 'opacity-0'), 3000);
     }
 
-    const cfgKeys = {
-      owner: 'gh.owner', repo: 'gh.repo', path: 'gh.path', branch: 'gh.branch', token: 'gh.token'
-    };
+    const cfgKeys = { owner: 'gh.owner', repo: 'gh.repo', path: 'gh.path', branch: 'gh.branch', token: 'gh.token' };
 
     function saveCfgToSession(cfg) {
       sessionStorage.setItem(cfgKeys.owner, cfg.owner || '');
@@ -240,26 +270,12 @@
     }
 
     // --- Base64 helpers (UTF-8 safe) ---
-    function toBase64(str) {
-      const utf8 = new TextEncoder().encode(str);
-      let bin = '';
-      utf8.forEach(b => bin += String.fromCharCode(b));
-      return btoa(bin);
-    }
-    function fromBase64(b64) {
-      const bin = atob(b64);
-      const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
-      return new TextDecoder().decode(bytes);
-    }
+    function toBase64(str) { const utf8 = new TextEncoder().encode(str); let bin=''; utf8.forEach(b=>bin+=String.fromCharCode(b)); return btoa(bin); }
+    function fromBase64(b64) { const bin = atob(b64); const bytes = Uint8Array.from(bin, c=>c.charCodeAt(0)); return new TextDecoder().decode(bytes); }
 
     // --- GitHub API ---
     function ghHeaders(token) {
-      return {
-        'Accept': 'application/vnd.github+json',
-        'Authorization': `Bearer ${token}`,
-        'X-GitHub-Api-Version': '2022-11-28',
-        'Content-Type': 'application/json'
-      };
+      return { 'Accept':'application/vnd.github+json','Authorization':`Bearer ${token}`,'X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json' };
     }
 
     async function ghGetFile({owner, repo, path, branch, token}) {
@@ -275,34 +291,24 @@
     // PUT with conflict retry + clearer errors
     async function ghPutFile(cfg, text, sha, messageHint='Update app data') {
       const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${encodeURIComponent(cfg.path)}`;
-      const body = (shaToUse) => JSON.stringify({
-        message: `${messageHint} (${new Date().toISOString()})`,
-        content: toBase64(text),
-        branch: cfg.branch,
-        ...(shaToUse ? { sha: shaToUse } : {})
-      });
-
+      const body = (shaToUse) => JSON.stringify({ message: `${messageHint} (${new Date().toISOString()})`, content: toBase64(text), branch: cfg.branch, ...(shaToUse ? { sha: shaToUse } : {}) });
       const attempt = async (shaArg) => {
         const res = await fetch(url, { method: 'PUT', headers: ghHeaders(cfg.token), body: body(shaArg) });
         if (res.ok) return (await res.json()).content.sha;
-
         const txt = await res.text();
-        if (res.status === 409) return { conflict: true, txt }; // stale SHA
-        if (res.status === 403) throw new Error(`GitHub PUT failed: 403 (token lacks access or branch is protected). Details: ${txt}`);
-        if (res.status === 422) throw new Error(`GitHub PUT failed: 422 (branch protection, invalid path, or encoding). Details: ${txt}`);
+        if (res.status === 409) return { conflict: true, txt };
+        if (res.status === 403) throw new Error(`GitHub PUT failed: 403 (token/branch). Details: ${txt}`);
+        if (res.status === 422) throw new Error(`GitHub PUT failed: 422 (path/encoding). Details: ${txt}`);
         throw new Error(`GitHub PUT failed: ${res.status} ${txt}`);
       };
-
       const first = await attempt(sha);
       if (first && typeof first === 'string') return first;
-
       if (first && first.conflict) {
-        // refresh latest SHA and retry once
         const { sha: latestSha } = await ghGetFile(cfg);
         if (!latestSha) throw new Error('Conflict detected but file SHA could not be refreshed.');
         const second = await attempt(latestSha);
         if (typeof second === 'string') return second;
-        throw new Error('Second attempt to save failed due to ongoing conflicts.');
+        throw new Error('Second attempt failed due to ongoing conflicts.');
       }
       throw new Error('Unexpected save flow.');
     }
@@ -316,8 +322,7 @@
     };
 
     // --- App State (single file) ---
-    // dataCache schema:
-    // { staff: {department: string[]}, records: Array<{id, department, name, date, duration, shift, month_year}> }
+    // dataCache schema: { staff: {department: string[]}, records: Array<{id, department, name, date, duration, shift, month_year}> }
     let cachedSha = null;
     let dataCache = { staff: defaultStaffLists, records: [] };
 
@@ -393,6 +398,16 @@
     const ghToken = document.getElementById('ghToken');
     const testConnection = document.getElementById('testConnection');
 
+    // Modal elements & state
+    const confirmModal = document.getElementById('confirmModal');
+    const modalOverlay = document.getElementById('modalOverlay');
+    const modalName = document.getElementById('modalName');
+    const modalDept = document.getElementById('modalDept');
+    const modalCancel = document.getElementById('modalCancel');
+    const modalConfirm = document.getElementById('modalConfirm');
+
+    let pendingRemove = null; // { dept, name }
+
     // --- UI helpers ---
     function updateNamesDropdown() {
       const lists = dataCache.staff || {};
@@ -432,7 +447,7 @@
         const noDataRow = document.createElement('tr');
         const noDataCell = document.createElement('td');
         noDataCell.colSpan = 6;
-        noDataCell.className = 'text-center py-4 text-gray-500 italic';
+        noDataCell className = 'text-center py-4 text-gray-500 italic';
         noDataCell.textContent = 'No leave records found. Add one above!';
         noDataRow.appendChild(noDataCell);
         tableBody.appendChild(noDataRow);
@@ -462,12 +477,10 @@
 
     // --- Bootstrap ---
     async function bootstrap() {
-      // preload settings UI from session
       const cfg = readCfgFromSession();
       ghOwner.value = cfg.owner; ghRepo.value = cfg.repo; ghBranch.value = cfg.branch;
       ghPath.value = cfg.path; ghToken.value = cfg.token;
 
-      // load everything from GitHub (or defaults)
       dataCache = await loadAllFromGitHub();
       renderTable(dataCache.records);
       updateNamesDropdown();
@@ -490,8 +503,6 @@
       };
       saveCfgToSession(cfg);
       showMessage('Settings saved to session.');
-
-      // Reload from GitHub with new settings
       dataCache = await loadAllFromGitHub();
       renderTable(dataCache.records);
       updateNamesDropdown();
@@ -530,13 +541,11 @@
         return;
       }
 
-      // limit by month: 2h
       const monthYear = date.substring(0, 7);
       const hoursTaken = dataCache.records
         .filter(r => r.name === name && r.month_year === monthYear)
         .reduce((t, r) => t + parseInt(r.duration.split(' ')[0], 10), 0);
       const newDuration = parseInt(duration.split(' ')[0], 10);
-
       const remaining = Math.max(0, 2 - hoursTaken);
       if (hoursTaken + newDuration > 2) {
         showMessage(`Monthly limit is 2 hours. ${name} has ${remaining} hour(s) left for ${monthYear}.`, 'error');
@@ -621,9 +630,9 @@
       }
     });
 
-    // Remove staff (with confirmation; sync to GitHub)
+    // --- Remove staff flow with Tailwind modal ---
     removeStaffDepartmentDropdown.addEventListener('change', updateRemoveStaffDropdown);
-    removeStaffForm.addEventListener('submit', async (e) => {
+    removeStaffForm.addEventListener('submit', (e) => {
       e.preventDefault();
       const dept = removeStaffDepartmentDropdown.value;
       const name = removeStaffNameDropdown.value;
@@ -633,18 +642,44 @@
         return;
       }
 
-      // Confirmation step
-      const okCfm = confirm(`Remove "${name}" from "${dept}"?\n\nThis updates the staff list in GitHub and will NOT delete existing leave records.`);
-      if (!okCfm) {
-        showMessage('Removal cancelled.');
-        return;
-      }
+      // Open modal with details
+      pendingRemove = { dept, name };
+      modalName.textContent = name;
+      modalDept.textContent = dept;
+      openModal();
+    });
+
+    function openModal() {
+      confirmModal.classList.remove('hidden');
+      confirmModal.setAttribute('aria-hidden', 'false');
+      // Focus the primary action
+      setTimeout(() => modalConfirm.focus(), 0);
+      // ESC support
+      document.addEventListener('keydown', onEscClose);
+    }
+    function closeModal() {
+      confirmModal.classList.add('hidden');
+      confirmModal.setAttribute('aria-hidden', 'true');
+      document.removeEventListener('keydown', onEscClose);
+    }
+    function onEscClose(e) {
+      if (e.key === 'Escape') closeModal();
+    }
+
+    modalOverlay.addEventListener('click', closeModal);
+    modalCancel.addEventListener('click', closeModal);
+
+    modalConfirm.addEventListener('click', async () => {
+      if (!pendingRemove) return;
+      const { dept, name } = pendingRemove;
 
       const lists = JSON.parse(JSON.stringify(dataCache.staff || {}));
       const arr = lists[dept] || [];
       const idx = arr.indexOf(name);
       if (idx === -1) {
         showMessage('That staff member was not found in the selected department.', 'error');
+        closeModal();
+        pendingRemove = null;
         return;
       }
 
@@ -652,12 +687,15 @@
       lists[dept] = arr;
 
       const nextData = { ...dataCache, staff: lists };
-      if (await saveAllToGitHub(nextData, `Remove staff "${name}" from ${dept}`)) {
+      const ok = await saveAllToGitHub(nextData, `Remove staff "${name}" from ${dept}`);
+      if (ok) {
         dataCache = nextData;
         updateRemoveStaffDropdown();
         if (departmentDropdown.value === dept) updateNamesDropdown();
         showMessage(`${name} removed from ${dept} and synced to GitHub.`);
       }
+      closeModal();
+      pendingRemove = null;
     });
 
     // Boot
